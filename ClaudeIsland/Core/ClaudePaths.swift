@@ -111,7 +111,7 @@ enum ClaudePaths {
         return home.appendingPathComponent(".claude")
     }
 
-    private static func shellQuote(_ path: String) -> String {
+    static func shellQuote(_ path: String) -> String {
         "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 }

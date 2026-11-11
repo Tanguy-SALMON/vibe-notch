@@ -28,7 +28,31 @@ struct HookInstaller {
             )
         }
 
+        if let bundled = Bundle.main.url(forResource: "claude-island-statusline", withExtension: "py") {
+            let dest = hooksDir.appendingPathComponent("claude-island-statusline.py")
+            try? FileManager.default.removeItem(at: dest)
+            try? FileManager.default.copyItem(at: bundled, to: dest)
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dest.path)
+        }
+
         updateSettings(at: ClaudePaths.settingsFile)
+    }
+
+    /// Point `statusLine` at our forwarder (which feeds rate-limit usage to the app),
+    /// remembering any pre-existing command so the forwarder can chain to it.
+    private static func installStatusLine(into json: inout [String: Any], python: String) {
+        let scriptPath = ClaudePaths.shellQuote(
+            ClaudePaths.hooksDir.appendingPathComponent("claude-island-statusline.py").path
+        )
+        let command = "\(python) \(scriptPath)"
+        let origFile = ClaudePaths.hooksDir.appendingPathComponent("claude-island-statusline.orig")
+
+        if let existing = json["statusLine"] as? [String: Any],
+           let existingCommand = existing["command"] as? String,
+           !existingCommand.contains("claude-island-statusline.py") {
+            try? existingCommand.write(to: origFile, atomically: true, encoding: .utf8)
+        }
+        json["statusLine"] = ["type": "command", "command": command]
     }
 
     private static func updateSettings(at settingsURL: URL) {
@@ -87,6 +111,7 @@ struct HookInstaller {
         }
 
         json["hooks"] = hooks
+        installStatusLine(into: &json, python: python)
 
         if let data = try? JSONSerialization.data(
             withJSONObject: json,

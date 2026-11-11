@@ -405,6 +405,15 @@ class HookSocketServer {
 
         let data = allData
 
+        if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           obj["event"] as? String == "RateLimits" {
+            if let limits = obj["rate_limits"] as? [String: Any] {
+                Task { @MainActor in UsageStore.shared.update(from: limits) }
+            }
+            close(clientSocket)
+            return
+        }
+
         guard let event = try? JSONDecoder().decode(HookEvent.self, from: data) else {
             logger.warning("Failed to parse event: \(String(data: data, encoding: .utf8) ?? "?", privacy: .public)")
             close(clientSocket)
