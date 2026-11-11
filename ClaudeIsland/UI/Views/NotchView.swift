@@ -66,6 +66,14 @@ struct NotchView: View {
 
     /// Extra width for expanding activities (like Dynamic Island)
     private var expansionWidth: CGFloat {
+        let base = baseExpansionWidth
+        return base > 0 && viewModel.status != .opened && usageStore.fiveHour != nil ? base + quotaWidth : base
+    }
+
+    /// Room on the right for the remaining-quota percentage
+    private let quotaWidth: CGFloat = 24
+
+    private var baseExpansionWidth: CGFloat {
         // Permission indicator adds width on left side only
         let permissionIndicatorWidth: CGFloat = hasPendingPermission ? 18 : 0
 
@@ -286,25 +294,24 @@ struct NotchView: View {
                     .frame(width: closedNotchSize.width - cornerRadiusInsets.closed.top + (isBouncing ? 16 : 0))
             }
 
-            // Right side - spinner when processing/pending, checkmark when waiting for input
+            // Right side - spinner when processing/pending (or nothing), plus remaining 5h quota
             if showClosedActivity {
-                if isProcessing || hasPendingPermission {
-                    ProcessingSpinner()
-                        .matchedGeometryEffect(id: "spinner", in: activityNamespace, isSource: showClosedActivity)
-                        .frame(width: viewModel.status == .opened ? 20 : sideWidth)
-                        .padding(.trailing, viewModel.status == .opened ? 0 : 4)
-                } else if hasWaitingForInput {
-                    // Remaining 5h quota (plain digits) when waiting for input
-                    Text(remainingQuotaText)
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundColor(Color(red: 0.85, green: 0.47, blue: 0.34))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                        .matchedGeometryEffect(id: "spinner", in: activityNamespace, isSource: showClosedActivity)
-                        .frame(width: viewModel.status == .opened ? 20 : sideWidth)
-                        .padding(.trailing, viewModel.status == .opened ? 0 : 4)
+                HStack(spacing: 4) {
+                    if isProcessing || hasPendingPermission {
+                        ProcessingSpinner()
+                            .matchedGeometryEffect(id: "spinner", in: activityNamespace, isSource: showClosedActivity)
+                    }
+                    if viewModel.status != .opened && usageStore.fiveHour != nil {
+                        Text(remainingQuotaText)
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundColor(Color(red: 0.85, green: 0.47, blue: 0.34))
+                            .lineLimit(1)
+                            .fixedSize()
+                    }
                 }
+                .frame(width: viewModel.status == .opened ? 20 : sideWidth + (usageStore.fiveHour != nil ? quotaWidth : 0))
+                .padding(.trailing, viewModel.status == .opened ? 0 : 4)
             }
         }
         .frame(height: closedNotchSize.height)
