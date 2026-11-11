@@ -13,11 +13,11 @@ import SwiftUI
 /// Caches parsed markdown documents to avoid re-parsing
 private final class DocumentCache: @unchecked Sendable {
     static let shared = DocumentCache()
-    private var cache: [String: Document] = [:]
+    private var cache: [String: Markdown.Document] = [:]
     private let lock = NSLock()
     private let maxSize = 100
 
-    func document(for text: String) -> Document {
+    func document(for text: String) -> Markdown.Document {
         lock.lock()
         defer { lock.unlock() }
 
@@ -42,7 +42,7 @@ struct MarkdownText: View {
     let baseColor: Color
     let fontSize: CGFloat
 
-    private let document: Document
+    private let document: Markdown.Document
 
     init(_ text: String, color: Color = .white.opacity(0.9), fontSize: CGFloat = 13) {
         self.text = text
