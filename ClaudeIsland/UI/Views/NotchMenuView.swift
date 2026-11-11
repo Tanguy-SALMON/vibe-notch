@@ -14,6 +14,7 @@ import ServiceManagement
 
 struct NotchMenuView: View {
     @AppStorage("muteNotchAnimation") private var muteAnimation = false
+    @AppStorage("showUsageBorder") private var showUsageBorder = true
     @ObservedObject var viewModel: NotchViewModel
     @ObservedObject private var screenSelector = ScreenSelector.shared
     @ObservedObject private var soundSelector = SoundSelector.shared
@@ -71,6 +72,14 @@ struct NotchMenuView: View {
                     isOn: muteAnimation
                 ) {
                     muteAnimation.toggle()
+                }
+
+                MenuToggleRow(
+                    icon: "gauge.with.dots.needle.33percent",
+                    label: "Usage Border",
+                    isOn: showUsageBorder
+                ) {
+                    showUsageBorder.toggle()
                 }
 
                 MenuToggleRow(

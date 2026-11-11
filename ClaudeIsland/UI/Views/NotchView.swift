@@ -20,6 +20,7 @@ struct NotchView: View {
     @StateObject private var sessionMonitor = ClaudeSessionMonitor()
     @StateObject private var activityCoordinator = NotchActivityCoordinator.shared
     @ObservedObject private var usageStore = UsageStore.shared
+    @AppStorage("showUsageBorder") private var showUsageBorder = true
     @State private var previousPendingIds: Set<String> = []
     @State private var previousWaitingForInputIds: Set<String> = []
     @State private var waitingForInputTimestamps: [String: Date] = [:]  // sessionId -> when it entered waitingForInput
@@ -152,8 +153,10 @@ struct NotchView: View {
                     .background(.black)
                     .clipShape(currentNotchShape)
                     .overlay {
-                        if let window = usageStore.fiveHour {
+                        if showUsageBorder, let window = usageStore.fiveHour,
+                           window.resetsAt.map({ $0 > Date() }) ?? true {
                             UsageBorder(fraction: window.usedPercentage / 100, shape: currentNotchShape)
+                                .help(usageTooltip(window))
                         }
                     }
                     .overlay(alignment: .top) {
@@ -501,5 +504,20 @@ struct NotchView: View {
         }
 
         return false
+    }
+}
+
+
+extension NotchView {
+    fileprivate func usageTooltip(_ five: UsageStore.Window) -> String {
+        var text = "5h: \(Int(five.usedPercentage.rounded()))% used"
+        if let reset = five.resetsAt {
+            let mins = max(0, Int(reset.timeIntervalSinceNow / 60))
+            text += " · resets in " + (mins >= 60 ? "\(mins / 60)h \(mins % 60)m" : "\(mins)m")
+        }
+        if let week = usageStore.sevenDay {
+            text += " · week: \(Int(week.usedPercentage.rounded()))%"
+        }
+        return text
     }
 }
