@@ -294,8 +294,13 @@ struct NotchView: View {
                         .frame(width: viewModel.status == .opened ? 20 : sideWidth)
                         .padding(.trailing, viewModel.status == .opened ? 0 : 4)
                 } else if hasWaitingForInput {
-                    // Checkmark for waiting-for-input on the right side
-                    ReadyForInputIndicatorIcon(size: 14, color: TerminalColors.green)
+                    // Remaining 5h quota (plain digits) when waiting for input
+                    Text(remainingQuotaText)
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundColor(Color(red: 0.85, green: 0.47, blue: 0.34))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                         .matchedGeometryEffect(id: "spinner", in: activityNamespace, isSource: showClosedActivity)
                         .frame(width: viewModel.status == .opened ? 20 : sideWidth)
                         .padding(.trailing, viewModel.status == .opened ? 0 : 4)
@@ -303,6 +308,12 @@ struct NotchView: View {
             }
         }
         .frame(height: closedNotchSize.height)
+    }
+
+    /// Remaining 5-hour quota as a percentage, e.g. "60%"; "–" when no usage data yet
+    private var remainingQuotaText: String {
+        guard let window = usageStore.fiveHour else { return "–" }
+        return "\(Int((100 - window.usedPercentage).rounded()))%"
     }
 
     private var sideWidth: CGFloat {

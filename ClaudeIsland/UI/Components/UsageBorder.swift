@@ -13,11 +13,11 @@ struct UsageBorder: View {
 
     var body: some View {
         ZStack {
-            shape.stroke(Color.white.opacity(0.14), lineWidth: 1.5)
+            shape.stroke(Color.white.opacity(0.14), lineWidth: 3.5)
             shape.trim(from: 0, to: 1)
                 .stroke(
                     color,
-                    style: StrokeStyle(lineWidth: 1.5, lineCap: .round)
+                    style: StrokeStyle(lineWidth: 3.5, lineCap: .round)
                 )
                 .mask(progressMask)
         }
