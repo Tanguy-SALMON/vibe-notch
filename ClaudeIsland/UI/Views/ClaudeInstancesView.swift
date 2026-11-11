@@ -72,6 +72,7 @@ struct ClaudeInstancesView: View {
                     InstanceRow(
                         session: session,
                         onFocus: { focusSession(session) },
+                        onFullScreen: { fullScreenSession(session) },
                         onChat: { openChat(session) },
                         onArchive: { archiveSession(session) },
                         onApprove: { approveSession(session) },
@@ -99,6 +100,12 @@ struct ClaudeInstancesView: View {
         }
     }
 
+    private func fullScreenSession(_ session: SessionState) {
+        Task {
+            await TerminalFullScreen.enter(forClaudePid: session.pid, cwd: session.cwd)
+        }
+    }
+
     private func openChat(_ session: SessionState) {
         viewModel.showChat(for: session)
     }
@@ -121,6 +128,7 @@ struct ClaudeInstancesView: View {
 struct InstanceRow: View {
     let session: SessionState
     let onFocus: () -> Void
+    let onFullScreen: () -> Void
     let onChat: () -> Void
     let onArchive: () -> Void
     let onApprove: () -> Void
@@ -288,6 +296,11 @@ struct InstanceRow: View {
                     // Chat icon - always show
                     IconButton(icon: "bubble.left") {
                         onChat()
+                    }
+
+                    // Full screen the session's terminal window
+                    IconButton(icon: "arrow.up.left.and.arrow.down.right") {
+                        onFullScreen()
                     }
 
                     // Focus icon (only for tmux instances with yabai)
