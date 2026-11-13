@@ -47,10 +47,10 @@ final class UsageStore: ObservableObject {
     /// Called at launch and whenever the notch is opened (no background polling), at most
     /// once every 10 min (30s when under 20% remains). The status line feed (claude-island-statusline.py) updates the same
     /// store and acts as a fallback.
-    func refreshIfStale() {
+    func refreshIfStale(force: Bool = false) {
         // Refresh at most every 10 min while more than 20% of the quota remains; every 30s otherwise.
         let remaining = 100 - (fiveHour?.usedPercentage ?? 100)
-        let minInterval: TimeInterval = remaining > 20 ? 600 : 30
+        let minInterval: TimeInterval = force ? 5 : (remaining > 20 ? 600 : 30)
         guard !isFetching, Date().timeIntervalSince(lastFetch) > minInterval else { return }
         isFetching = true
         lastFetch = Date()
