@@ -45,10 +45,13 @@ final class UsageStore: ObservableObject {
 
     /// Fetch usage from Anthropic's usage endpoint using Claude Code's login token.
     /// Called at launch and whenever the notch is opened (no background polling), at most
-    /// once every 30s. The status line feed (claude-island-statusline.py) updates the same
+    /// once every 10 min (30s when under 20% remains). The status line feed (claude-island-statusline.py) updates the same
     /// store and acts as a fallback.
     func refreshIfStale() {
-        guard !isFetching, Date().timeIntervalSince(lastFetch) > 30 else { return }
+        // Refresh at most every 10 min while more than 20% of the quota remains; every 30s otherwise.
+        let remaining = 100 - (fiveHour?.usedPercentage ?? 100)
+        let minInterval: TimeInterval = remaining > 20 ? 600 : 30
+        guard !isFetching, Date().timeIntervalSince(lastFetch) > minInterval else { return }
         isFetching = true
         lastFetch = Date()
         Task.detached(priority: .utility) { [weak self] in

@@ -713,6 +713,14 @@ actor SessionStore {
                   case .task(let taskResult) = structuredResult,
                   !taskResult.agentId.isEmpty else { continue }
 
+            // Already populated and every subagent tool has finished: nothing more to read.
+            // (Re-parsing agent files for every historical Task on each update burned CPU.)
+            if tool.status != .running,
+               !tool.subagentTools.isEmpty,
+               !tool.subagentTools.contains(where: { $0.status == .running }) {
+                continue
+            }
+
             let taskToolId = session.chatItems[i].id
 
             // Store agentId → description mapping for AgentOutputTool display
