@@ -318,6 +318,15 @@ struct NotchView: View {
         .frame(height: closedNotchSize.height)
     }
 
+    /// e.g. "55% left · resets 14:00" (adds the weekday when the reset isn't today)
+    private func quotaResetText(for window: UsageStore.Window) -> String {
+        let left = "\(Int((100 - window.usedPercentage).rounded()))% left"
+        guard let reset = window.resetsAt else { return left }
+        let formatter = DateFormatter()
+        formatter.dateFormat = Calendar.current.isDateInToday(reset) ? "HH:mm" : "EEE HH:mm"
+        return "\(left) · resets \(formatter.string(from: reset))"
+    }
+
     /// Remaining 5-hour quota as a percentage, e.g. "60%"; "–" when no usage data yet
     private var remainingQuotaText: String {
         guard let window = usageStore.fiveHour else { return "–" }
@@ -342,6 +351,15 @@ struct NotchView: View {
             }
 
             Spacer()
+
+            // 5h quota: remaining + next reset time
+            if let window = usageStore.fiveHour {
+                Text(quotaResetText(for: window))
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundColor(Color(red: 0.85, green: 0.47, blue: 0.34).opacity(0.9))
+                    .lineLimit(1)
+            }
 
             // Menu toggle
             Button {
