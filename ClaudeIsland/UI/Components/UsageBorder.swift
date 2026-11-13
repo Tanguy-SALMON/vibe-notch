@@ -21,20 +21,9 @@ struct UsageBorder: View {
                 )
                 .mask(progressMask)
         }
-        .mask(bottomBand)
         .animation(.spring(response: 1.2, dampingFraction: 1.0), value: fraction)
         .animation(.easeInOut(duration: 1.0), value: color)
         .allowsHitTesting(false)
-    }
-
-    /// Keep only the bottom edge and its rounded corners (no side or top strokes).
-    private var bottomBand: some View {
-        GeometryReader { geo in
-            Rectangle()
-                .frame(height: shape.bottomCornerRadius + 2)
-                .frame(maxHeight: .infinity, alignment: .bottom)
-                .frame(width: geo.size.width)
-        }
     }
 
     /// Reveal the stroke left-to-right across the width, so it fills along the bottom edge.
