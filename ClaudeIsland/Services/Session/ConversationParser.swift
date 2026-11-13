@@ -135,15 +135,19 @@ actor ConversationParser {
         }
 
         // Full parse (first time, or file was truncated/replaced)
-        guard let data = fileManager.contents(atPath: sessionFile),
-              let content = String(data: data, encoding: .utf8) else {
+        guard let data = fileManager.contents(atPath: sessionFile) else {
+            return ConversationInfo(summary: nil, lastMessage: nil, lastMessageRole: nil, lastToolName: nil, firstUserMessage: nil, lastUserMessageDate: nil)
+        }
+
+        // Only consume up to the last complete line; a partial trailing line is re-read next time
+        // (and must not be parsed now, or its usage would be counted twice).
+        let consumed = data.lastIndex(of: 0x0A).map { $0 + 1 } ?? 0
+        guard let content = String(data: data.prefix(consumed), encoding: .utf8) else {
             return ConversationInfo(summary: nil, lastMessage: nil, lastMessageRole: nil, lastToolName: nil, firstUserMessage: nil, lastUserMessageDate: nil)
         }
 
         let info = parseContent(content)
-        // Only consume up to the last complete line; a partial trailing line is re-read next time.
-        let consumed = UInt64(data.lastIndex(of: 0x0A).map { $0 + 1 } ?? 0)
-        cache[sessionFile] = CachedInfo(modificationDate: modDate, info: info, offset: consumed)
+        cache[sessionFile] = CachedInfo(modificationDate: modDate, info: info, offset: UInt64(consumed))
 
         return info
     }

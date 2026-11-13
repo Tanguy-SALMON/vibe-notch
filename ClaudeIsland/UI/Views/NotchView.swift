@@ -318,12 +318,18 @@ struct NotchView: View {
         .frame(height: closedNotchSize.height)
     }
 
+    private static let resetTimeFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "HH:mm"; return f
+    }()
+    private static let resetDayTimeFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "EEE HH:mm"; return f
+    }()
+
     /// e.g. "55% left · resets 14:00" (adds the weekday when the reset isn't today)
     private func quotaResetText(for window: UsageStore.Window) -> String {
         let left = "\(Int((100 - window.usedPercentage).rounded()))% left"
         guard let reset = window.resetsAt else { return left }
-        let formatter = DateFormatter()
-        formatter.dateFormat = Calendar.current.isDateInToday(reset) ? "HH:mm" : "EEE HH:mm"
+        let formatter = Calendar.current.isDateInToday(reset) ? Self.resetTimeFormatter : Self.resetDayTimeFormatter
         return "\(left) · resets \(formatter.string(from: reset))"
     }
 
