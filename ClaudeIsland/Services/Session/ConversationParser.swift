@@ -63,6 +63,8 @@ actor ConversationParser {
     private struct CachedInfo {
         let modificationDate: Date
         let info: ConversationInfo
+        /// Byte offset up to which the file has been consumed (always at a line boundary)
+        let offset: UInt64
     }
 
     /// State for incremental JSONL parsing
@@ -116,16 +118,70 @@ actor ConversationParser {
         if let cached = cache[sessionFile], cached.modificationDate == modDate {
             return cached.info
         }
+        let fileSize = (attrs[.size] as? NSNumber)?.uint64Value ?? 0
 
+        // Incremental path: only read and parse bytes appended since the last parse.
+        // (Re-parsing the whole transcript on every write burned CPU on long sessions.)
+        if let cached = cache[sessionFile], fileSize >= cached.offset {
+            if fileSize == cached.offset {
+                cache[sessionFile] = CachedInfo(modificationDate: modDate, info: cached.info, offset: cached.offset)
+                return cached.info
+            }
+            if let (text, consumed) = Self.readAppendedLines(path: sessionFile, from: cached.offset) {
+                let merged = text.isEmpty ? cached.info : Self.merge(cached.info, with: parseContent(text))
+                cache[sessionFile] = CachedInfo(modificationDate: modDate, info: merged, offset: cached.offset + consumed)
+                return merged
+            }
+        }
+
+        // Full parse (first time, or file was truncated/replaced)
         guard let data = fileManager.contents(atPath: sessionFile),
               let content = String(data: data, encoding: .utf8) else {
             return ConversationInfo(summary: nil, lastMessage: nil, lastMessageRole: nil, lastToolName: nil, firstUserMessage: nil, lastUserMessageDate: nil)
         }
 
         let info = parseContent(content)
-        cache[sessionFile] = CachedInfo(modificationDate: modDate, info: info)
+        // Only consume up to the last complete line; a partial trailing line is re-read next time.
+        let consumed = UInt64(data.lastIndex(of: 0x0A).map { $0 + 1 } ?? 0)
+        cache[sessionFile] = CachedInfo(modificationDate: modDate, info: info, offset: consumed)
 
         return info
+    }
+
+    /// Read complete lines appended after `offset`. Returns the text and the number of bytes consumed.
+    private static func readAppendedLines(path: String, from offset: UInt64) -> (String, UInt64)? {
+        guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
+        defer { try? handle.close() }
+        do {
+            try handle.seek(toOffset: offset)
+            guard let data = try handle.readToEnd(), !data.isEmpty else { return ("", 0) }
+            guard let lastNewline = data.lastIndex(of: 0x0A) else { return ("", 0) }
+            let complete = data.prefix(through: lastNewline)
+            guard let text = String(data: complete, encoding: .utf8) else { return nil }
+            return (text, UInt64(complete.count))
+        } catch {
+            return nil
+        }
+    }
+
+    /// Combine info for previously parsed content with info for newly appended content.
+    private static func merge(_ old: ConversationInfo, with new: ConversationInfo) -> ConversationInfo {
+        var usage = old.usage
+        usage.inputTokens += new.usage.inputTokens
+        usage.outputTokens += new.usage.outputTokens
+        usage.cacheReadTokens += new.usage.cacheReadTokens
+        usage.cacheCreationTokens += new.usage.cacheCreationTokens
+
+        let hasNewLast = new.lastMessage != nil
+        return ConversationInfo(
+            summary: new.summary ?? old.summary,
+            lastMessage: hasNewLast ? new.lastMessage : old.lastMessage,
+            lastMessageRole: hasNewLast ? new.lastMessageRole : old.lastMessageRole,
+            lastToolName: hasNewLast ? new.lastToolName : old.lastToolName,
+            firstUserMessage: old.firstUserMessage ?? new.firstUserMessage,
+            lastUserMessageDate: new.lastUserMessageDate ?? old.lastUserMessageDate,
+            usage: usage
+        )
     }
 
     /// Parse JSONL content

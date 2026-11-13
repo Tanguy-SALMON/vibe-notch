@@ -40,19 +40,22 @@ final class UsageStore: ObservableObject {
 
     // MARK: - Polling (OAuth usage endpoint)
 
-    private var pollTask: Task<Void, Never>?
+    private var lastFetch = Date.distantPast
+    private var isFetching = false
 
-    /// Poll Anthropic's usage endpoint every 60s using Claude Code's login token.
-    /// The status line feed (see claude-island-statusline.py) updates the same store
-    /// and acts as a fallback when the token or endpoint is unavailable.
-    func startPolling() {
-        guard pollTask == nil else { return }
-        pollTask = Task.detached(priority: .utility) { [weak self] in
-            while !Task.isCancelled {
-                if let limits = await Self.fetchUsage() {
-                    await MainActor.run { self?.update(from: limits) }
-                }
-                try? await Task.sleep(nanoseconds: 60 * 1_000_000_000)
+    /// Fetch usage from Anthropic's usage endpoint using Claude Code's login token.
+    /// Called at launch and whenever the notch is opened (no background polling), at most
+    /// once every 30s. The status line feed (claude-island-statusline.py) updates the same
+    /// store and acts as a fallback.
+    func refreshIfStale() {
+        guard !isFetching, Date().timeIntervalSince(lastFetch) > 30 else { return }
+        isFetching = true
+        lastFetch = Date()
+        Task.detached(priority: .utility) { [weak self] in
+            let limits = await Self.fetchUsage()
+            await MainActor.run {
+                if let limits { self?.update(from: limits) }
+                self?.isFetching = false
             }
         }
     }
