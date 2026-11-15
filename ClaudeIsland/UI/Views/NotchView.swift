@@ -244,7 +244,8 @@ struct NotchView: View {
         VStack(alignment: .leading, spacing: 0) {
             // Header row - always present, contains crab and spinner that persist across states
             headerRow
-                .frame(height: max(24, closedNotchSize.height))
+                // 2 pt taller than the hardware notch when compact, so our notch reads as a deliberate shape
+                .frame(height: max(24, closedNotchSize.height) + (viewModel.status == .opened ? 0 : 2))
 
             // Main content only when opened
             if viewModel.status == .opened {
@@ -323,7 +324,8 @@ struct NotchView: View {
                             .fixedSize()
                     }
                 }
-                .frame(width: viewModel.status == .opened ? 20 : sideWidth + (usageStore.fiveHour != nil ? quotaWidth : 0))
+                .frame(width: viewModel.status == .opened ? 20 : sideWidth + (usageStore.fiveHour != nil ? quotaWidth : 0),
+                       alignment: viewModel.status == .opened ? .center : .trailing)
                 .padding(.trailing, viewModel.status == .opened ? 0 : 1)
             }
         }
