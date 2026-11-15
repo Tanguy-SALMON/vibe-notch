@@ -368,8 +368,8 @@ struct NotchView: View {
                     .foregroundColor(Color(red: 0.85, green: 0.47, blue: 0.34).opacity(0.9))
                     .lineLimit(1)
                     // With activity the crab sits in the header row, on top of this content: leave room for it,
-                    // plus a 10 pt left margin so the text never touches the icon
-                    .padding(.leading, (showClosedActivity ? 30 : 0) + 10)
+                    // plus a 7 pt left margin so the text never touches the icon
+                    .padding(.leading, (showClosedActivity ? 30 : 0) + 7)
             }
 
             Spacer()
