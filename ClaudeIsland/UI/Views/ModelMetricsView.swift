@@ -2,13 +2,13 @@
 //  ModelMetricsView.swift
 //  ClaudeIsland
 //
-//  Token consumption per model, aggregated over the tracked sessions.
+//  Token consumption per model over the last 7 days (from the transcripts, see ModelMetricsStore).
 //
 
 import SwiftUI
 
 struct ModelMetricsView: View {
-    let sessions: [SessionState]
+    @ObservedObject private var store = ModelMetricsStore.shared
 
     private let accent = Color(red: 0.85, green: 0.47, blue: 0.34)
 
@@ -19,18 +19,7 @@ struct ModelMetricsView: View {
     }
 
     private var rows: [Row] {
-        var totals: [String: UsageInfo] = [:]
-        for session in sessions {
-            for (model, usage) in session.conversationInfo.usageByModel {
-                var t = totals[model] ?? UsageInfo()
-                t.inputTokens += usage.inputTokens
-                t.outputTokens += usage.outputTokens
-                t.cacheReadTokens += usage.cacheReadTokens
-                t.cacheCreationTokens += usage.cacheCreationTokens
-                totals[model] = t
-            }
-        }
-        return totals
+        store.byModel
             .map { Row(id: $0.key, name: Self.displayName($0.key), usage: $0.value) }
             .sorted { $0.usage.totalTokens > $1.usage.totalTokens }
     }
@@ -41,7 +30,7 @@ struct ModelMetricsView: View {
 
         if rows.isEmpty {
             VStack(spacing: 8) {
-                Text("No usage yet")
+                Text(store.isScanning ? "Reading transcripts…" : "No usage in the last 7 days")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.white.opacity(0.4))
                 Text("Token counts per model appear here")
@@ -49,6 +38,7 @@ struct ModelMetricsView: View {
                     .foregroundColor(.white.opacity(0.25))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onAppear { store.refresh() }
         } else {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 10) {
@@ -84,6 +74,7 @@ struct ModelMetricsView: View {
                 .padding(.vertical, 8)
             }
             .scrollBounceBehavior(.basedOnSize)
+            .onAppear { store.refresh() }
         }
     }
 

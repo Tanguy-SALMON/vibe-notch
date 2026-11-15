@@ -20,7 +20,7 @@ struct ClaudeInstancesView: View {
         let sessionsOn = showSessions || !showMetrics
         VStack(spacing: 0) {
             if showMetrics {
-                ModelMetricsView(sessions: sessionMonitor.instances)
+                ModelMetricsView()
                     .frame(maxHeight: sessionsOn ? 150 : .infinity)
                 if sessionsOn {
                     Divider().background(Color.white.opacity(0.08))
