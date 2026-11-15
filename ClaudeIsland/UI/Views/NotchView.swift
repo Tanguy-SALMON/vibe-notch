@@ -324,7 +324,7 @@ struct NotchView: View {
                     }
                 }
                 .frame(width: viewModel.status == .opened ? 20 : sideWidth + (usageStore.fiveHour != nil ? quotaWidth : 0))
-                .padding(.trailing, viewModel.status == .opened ? 0 : 4)
+                .padding(.trailing, viewModel.status == .opened ? 0 : 1)
             }
         }
         .frame(height: closedNotchSize.height)
