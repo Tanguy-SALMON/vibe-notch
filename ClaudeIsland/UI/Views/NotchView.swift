@@ -259,6 +259,14 @@ struct NotchView: View {
         }
     }
 
+    /// Crab animation state: permission > processing > waiting for input > idle
+    private var crabMood: CrabMood {
+        if hasPendingPermission { return .alert }
+        if isProcessing { return .processing }
+        if hasWaitingForInput { return .waiting }
+        return .idle
+    }
+
     // MARK: - Header Row (persists across states)
 
     @ViewBuilder
@@ -267,7 +275,7 @@ struct NotchView: View {
             // Left side - crab + optional permission indicator (visible when processing, pending, or waiting for input)
             if showClosedActivity {
                 HStack(spacing: 4) {
-                    ClaudeCrabIcon(size: 14, animateLegs: isProcessing)
+                    ClaudeCrabIcon(size: 14, animateLegs: isProcessing, mood: crabMood)
                         .matchedGeometryEffect(id: "crab", in: activityNamespace, isSource: showClosedActivity)
 
                     // Permission indicator only (amber) - waiting for input shows checkmark on right
@@ -359,8 +367,9 @@ struct NotchView: View {
                     .monospacedDigit()
                     .foregroundColor(Color(red: 0.85, green: 0.47, blue: 0.34).opacity(0.9))
                     .lineLimit(1)
-                    // With activity the crab sits in the header row, on top of this content: leave room for it
-                    .padding(.leading, showClosedActivity ? 30 : 0)
+                    // With activity the crab sits in the header row, on top of this content: leave room for it,
+                    // plus a 10 pt left margin so the text never touches the icon
+                    .padding(.leading, (showClosedActivity ? 30 : 0) + 10)
             }
 
             Spacer()
