@@ -118,9 +118,9 @@ final class ModelMetricsStore: ObservableObject {
 
     /// Scan on demand (metrics view appears, range changes to Overall); at most once every 20s unless a wider scan is needed.
     /// Recent ranges read the last 8 days of transcripts; "overall" reads every transcript once (then stays incremental).
-    func refresh(needsAll: Bool = false) {
+    func refresh(needsAll: Bool = false, force: Bool = false) {
         let wider = needsAll && !scannedAll
-        guard !isScanning, wider || Date().timeIntervalSince(lastScan) > 20 else { return }
+        guard !isScanning, force || wider || Date().timeIntervalSince(lastScan) > 20 else { return }
         isScanning = true
         lastScan = Date()
         let all = needsAll || scannedAll
@@ -130,6 +130,20 @@ final class ModelMetricsStore: ObservableObject {
             if all { scannedAll = true }
             isScanning = false
         }
+    }
+
+    /// When the notch was opened the time before this one (nil the very first time). The metrics view shows the tokens
+    /// used since then, so "what did I spend since I last looked" is one glance.
+    @Published private(set) var sinceLastOpen: Date?
+    private static let lastOpenKey = "metricsLastOpenedAt"
+
+    /// Call each time the notch opens: remembers the previous open time for display and stores this one.
+    func markOpened() {
+        let defaults = UserDefaults.standard
+        let previous = defaults.object(forKey: Self.lastOpenKey) as? Date
+        sinceLastOpen = previous
+        defaults.set(Date(), forKey: Self.lastOpenKey)
+        refresh(force: true)
     }
 
     /// Token totals per model for usage at or after `since` (nil = everything scanned).

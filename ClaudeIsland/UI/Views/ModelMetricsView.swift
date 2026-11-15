@@ -109,6 +109,8 @@ struct ModelMetricsView: View {
     private var content: some View {
         let rows = rows
         let maxTokens = max(rows.first?.usage.totalTokens ?? 1, 1)
+        // Per-model tokens after the previous time the notch was opened (starting the minute after it)
+        let sinceTotals = store.sinceLastOpen.map { store.totals(since: $0.addingTimeInterval(60)) }
 
         if rows.isEmpty {
             VStack(spacing: 8) {
@@ -144,10 +146,25 @@ struct ModelMetricsView: View {
                                 }
                             }
                             .frame(height: 3)
-                            Text("in \(Self.format(row.usage.inputTokens)) · out \(Self.format(row.usage.outputTokens)) · cache r \(Self.format(row.usage.cacheReadTokens)) / w \(Self.format(row.usage.cacheCreationTokens))")
-                                .font(.system(size: 10))
-                                .monospacedDigit()
-                                .foregroundColor(.white.opacity(0.4))
+                            HStack(spacing: 8) {
+                                Text("in \(Self.format(row.usage.inputTokens)) · out \(Self.format(row.usage.outputTokens)) · cache r \(Self.format(row.usage.cacheReadTokens)) / w \(Self.format(row.usage.cacheCreationTokens))")
+                                    .font(.system(size: 10))
+                                    .monospacedDigit()
+                                    .foregroundColor(.white.opacity(0.4))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                                Spacer(minLength: 0)
+                                // Tokens used since the notch was last opened (stuck to the right, under the bar)
+                                if let sinceTotals, let since = store.sinceLastOpen {
+                                    let delta = sinceTotals[row.id]?.formattedTotal ?? "0"
+                                    Text("+\(delta) since \(ClockFormat.string(since, use24Hour: use24HourTime))")
+                                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                                        .monospacedDigit()
+                                        .foregroundColor(accent.opacity(0.85))
+                                        .lineLimit(1)
+                                        .fixedSize()
+                                }
+                            }
                         }
                         .padding(.horizontal, 14)
                     }
