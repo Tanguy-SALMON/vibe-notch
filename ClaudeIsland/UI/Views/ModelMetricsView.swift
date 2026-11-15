@@ -27,6 +27,7 @@ struct ModelMetricsView: View {
     @ObservedObject private var store = ModelMetricsStore.shared
     @ObservedObject private var usageStore = UsageStore.shared
     @AppStorage("metricsRange") private var rangeRaw = MetricsRange.today.rawValue
+    @AppStorage(ClockFormat.defaultsKey) private var use24HourTime = true
 
     private let accent = Color(red: 0.85, green: 0.47, blue: 0.34)
 
@@ -61,9 +62,7 @@ struct ModelMetricsView: View {
 
     private var rangeCaption: String {
         guard let start = rangeStart else { return "all transcripts" }
-        let f = DateFormatter()
-        f.dateFormat = Calendar.current.isDateInToday(start) ? "HH:mm" : "EEE HH:mm"
-        return "since \(f.string(from: start))"
+        return "since \(ClockFormat.string(start, use24Hour: use24HourTime))"
     }
 
     private var rows: [Row] {

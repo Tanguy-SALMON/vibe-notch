@@ -17,6 +17,7 @@ struct NotchMenuView: View {
     @AppStorage("showMetrics") private var showMetrics = false
     @AppStorage("muteNotchAnimation") private var muteAnimation = false
     @AppStorage("showUsageBorder") private var showUsageBorder = true
+    @AppStorage(ClockFormat.defaultsKey) private var use24HourTime = true
     @ObservedObject var viewModel: NotchViewModel
     @ObservedObject private var screenSelector = ScreenSelector.shared
     @ObservedObject private var soundSelector = SoundSelector.shared
@@ -66,6 +67,14 @@ struct NotchMenuView: View {
                     } catch {
                         print("Failed to toggle launch at login: \(error)")
                     }
+                }
+
+                MenuToggleRow(
+                    icon: "clock",
+                    label: "24-Hour Time",
+                    isOn: use24HourTime
+                ) {
+                    use24HourTime.toggle()
                 }
 
                 MenuToggleRow(

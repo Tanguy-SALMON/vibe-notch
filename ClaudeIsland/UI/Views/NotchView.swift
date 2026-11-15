@@ -20,6 +20,7 @@ struct NotchView: View {
     @StateObject private var sessionMonitor = ClaudeSessionMonitor()
     @StateObject private var activityCoordinator = NotchActivityCoordinator.shared
     @ObservedObject private var usageStore = UsageStore.shared
+    @AppStorage(ClockFormat.defaultsKey) private var use24HourTime = true
     @AppStorage("showUsageBorder") private var showUsageBorder = true
     @State private var previousPendingIds: Set<String> = []
     @State private var previousWaitingForInputIds: Set<String> = []
@@ -318,19 +319,14 @@ struct NotchView: View {
         .frame(height: closedNotchSize.height)
     }
 
-    private static let resetTimeFormatter: DateFormatter = {
-        let f = DateFormatter(); f.dateFormat = "HH:mm"; return f
-    }()
-    private static let resetDayTimeFormatter: DateFormatter = {
-        let f = DateFormatter(); f.dateFormat = "EEE HH:mm"; return f
-    }()
+    /// e.g. "81% left"
+    private func quotaLeftText(for window: UsageStore.Window) -> String {
+        "\(Int((100 - window.usedPercentage).rounded()))% left"
+    }
 
-    /// e.g. "55% left · resets 14:00" (adds the weekday when the reset isn't today)
-    private func quotaResetText(for window: UsageStore.Window) -> String {
-        let left = "\(Int((100 - window.usedPercentage).rounded()))% left"
-        guard let reset = window.resetsAt else { return left }
-        let formatter = Calendar.current.isDateInToday(reset) ? Self.resetTimeFormatter : Self.resetDayTimeFormatter
-        return "\(left) · resets \(formatter.string(from: reset))"
+    /// e.g. "reset 14:00" or "reset 2:00 PM" (adds the weekday when the reset isn't today); nil without a reset time
+    private func quotaResetText(for window: UsageStore.Window) -> String? {
+        window.resetsAt.map { "reset \(ClockFormat.string($0, use24Hour: use24HourTime))" }
     }
 
     /// Remaining 5-hour quota as a percentage, e.g. "60%"; "–" when no usage data yet
@@ -356,11 +352,22 @@ struct NotchView: View {
                     .padding(.leading, 8)
             }
 
+            // 5h quota: next reset time on the left ...
+            if let window = usageStore.fiveHour, let reset = quotaResetText(for: window) {
+                Text(reset)
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundColor(Color(red: 0.85, green: 0.47, blue: 0.34).opacity(0.9))
+                    .lineLimit(1)
+                    // With activity the crab sits in the header row, on top of this content: leave room for it
+                    .padding(.leading, showClosedActivity ? 30 : 0)
+            }
+
             Spacer()
 
-            // 5h quota: remaining + next reset time
+            // ... remaining quota on the right
             if let window = usageStore.fiveHour {
-                Text(quotaResetText(for: window))
+                Text(quotaLeftText(for: window))
                     .font(.system(size: 10, weight: .medium, design: .rounded))
                     .monospacedDigit()
                     .foregroundColor(Color(red: 0.85, green: 0.47, blue: 0.34).opacity(0.9))
