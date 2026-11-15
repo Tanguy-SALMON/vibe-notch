@@ -335,9 +335,9 @@ struct NotchView: View {
         "\(Int((100 - window.usedPercentage).rounded()))% left"
     }
 
-    /// e.g. "reset 14:00" or "reset 2:00 PM" (adds the weekday when the reset isn't today); nil without a reset time
+    /// e.g. "Reset 14:00" or "Reset 2:00 PM" (adds the weekday when the reset isn't today); nil without a reset time
     private func quotaResetText(for window: UsageStore.Window) -> String? {
-        window.resetsAt.map { "reset \(ClockFormat.string($0, use24Hour: use24HourTime))" }
+        window.resetsAt.map { "Reset \(ClockFormat.string($0, use24Hour: use24HourTime))" }
     }
 
     /// Remaining 5-hour quota as a percentage, e.g. "60%"; "–" when no usage data yet
@@ -371,8 +371,8 @@ struct NotchView: View {
                     .foregroundColor(Color(red: 0.85, green: 0.47, blue: 0.34).opacity(0.9))
                     .lineLimit(1)
                     // With activity the crab sits in the header row, on top of this content: leave room for it,
-                    // plus a 7 pt left margin so the text never touches the icon
-                    .padding(.leading, (showClosedActivity ? 30 : 0) + 7)
+                    // plus a 4 pt left margin so the text never touches the icon
+                    .padding(.leading, (showClosedActivity ? 30 : 0) + 4)
             }
 
             Spacer()
