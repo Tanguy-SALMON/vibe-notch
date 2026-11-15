@@ -40,6 +40,7 @@ struct ConversationInfo: Equatable {
     let firstUserMessage: String?  // Fallback title when no summary
     let lastUserMessageDate: Date?  // Timestamp of last user message (for stable sorting)
     var usage: UsageInfo = UsageInfo()  // Token usage stats
+    var usageByModel: [String: UsageInfo] = [:]  // Token usage per model id
 }
 
 actor ConversationParser {
@@ -176,6 +177,16 @@ actor ConversationParser {
         usage.cacheReadTokens += new.usage.cacheReadTokens
         usage.cacheCreationTokens += new.usage.cacheCreationTokens
 
+        var byModel = old.usageByModel
+        for (model, add) in new.usageByModel {
+            var total = byModel[model] ?? UsageInfo()
+            total.inputTokens += add.inputTokens
+            total.outputTokens += add.outputTokens
+            total.cacheReadTokens += add.cacheReadTokens
+            total.cacheCreationTokens += add.cacheCreationTokens
+            byModel[model] = total
+        }
+
         let hasNewLast = new.lastMessage != nil
         return ConversationInfo(
             summary: new.summary ?? old.summary,
@@ -184,7 +195,8 @@ actor ConversationParser {
             lastToolName: hasNewLast ? new.lastToolName : old.lastToolName,
             firstUserMessage: old.firstUserMessage ?? new.firstUserMessage,
             lastUserMessageDate: new.lastUserMessageDate ?? old.lastUserMessageDate,
-            usage: usage
+            usage: usage,
+            usageByModel: byModel
         )
     }
 
@@ -199,6 +211,7 @@ actor ConversationParser {
         var firstUserMessage: String?
         var lastUserMessageDate: Date?
         var usage = UsageInfo()
+        var usageByModel: [String: UsageInfo] = [:]
 
         let formatter = Self.isoFormatter
 
@@ -216,6 +229,15 @@ actor ConversationParser {
                 usage.outputTokens += usageDict["output_tokens"] as? Int ?? 0
                 usage.cacheReadTokens += usageDict["cache_read_input_tokens"] as? Int ?? 0
                 usage.cacheCreationTokens += usageDict["cache_creation_input_tokens"] as? Int ?? 0
+
+                if let model = message["model"] as? String, !model.hasPrefix("<") {
+                    var perModel = usageByModel[model] ?? UsageInfo()
+                    perModel.inputTokens += usageDict["input_tokens"] as? Int ?? 0
+                    perModel.outputTokens += usageDict["output_tokens"] as? Int ?? 0
+                    perModel.cacheReadTokens += usageDict["cache_read_input_tokens"] as? Int ?? 0
+                    perModel.cacheCreationTokens += usageDict["cache_creation_input_tokens"] as? Int ?? 0
+                    usageByModel[model] = perModel
+                }
             }
         }
 
@@ -310,7 +332,8 @@ actor ConversationParser {
             lastToolName: lastToolName,
             firstUserMessage: firstUserMessage,
             lastUserMessageDate: lastUserMessageDate,
-            usage: usage
+            usage: usage,
+            usageByModel: usageByModel
         )
     }
 

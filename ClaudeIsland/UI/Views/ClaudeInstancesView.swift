@@ -12,11 +12,27 @@ struct ClaudeInstancesView: View {
     @ObservedObject var sessionMonitor: ClaudeSessionMonitor
     @ObservedObject var viewModel: NotchViewModel
 
+    @AppStorage("showSessions") private var showSessions = true
+    @AppStorage("showMetrics") private var showMetrics = false
+
     var body: some View {
-        if sessionMonitor.instances.isEmpty {
-            emptyState
-        } else {
-            instancesList
+        // At least one section is always visible
+        let sessionsOn = showSessions || !showMetrics
+        VStack(spacing: 0) {
+            if showMetrics {
+                ModelMetricsView(sessions: sessionMonitor.instances)
+                    .frame(maxHeight: sessionsOn ? 150 : .infinity)
+                if sessionsOn {
+                    Divider().background(Color.white.opacity(0.08))
+                }
+            }
+            if sessionsOn {
+                if sessionMonitor.instances.isEmpty {
+                    emptyState
+                } else {
+                    instancesList
+                }
+            }
         }
     }
 

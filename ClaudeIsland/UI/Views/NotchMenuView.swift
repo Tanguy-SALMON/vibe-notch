@@ -13,6 +13,8 @@ import ServiceManagement
 // MARK: - NotchMenuView
 
 struct NotchMenuView: View {
+    @AppStorage("showSessions") private var showSessions = true
+    @AppStorage("showMetrics") private var showMetrics = false
     @AppStorage("muteNotchAnimation") private var muteAnimation = false
     @AppStorage("showUsageBorder") private var showUsageBorder = true
     @ObservedObject var viewModel: NotchViewModel
@@ -64,6 +66,24 @@ struct NotchMenuView: View {
                     } catch {
                         print("Failed to toggle launch at login: \(error)")
                     }
+                }
+
+                MenuToggleRow(
+                    icon: "list.bullet",
+                    label: "Show Sessions",
+                    isOn: showSessions || !showMetrics
+                ) {
+                    showSessions.toggle()
+                    if !showSessions && !showMetrics { showMetrics = true }
+                }
+
+                MenuToggleRow(
+                    icon: "chart.bar",
+                    label: "Show Model Metrics",
+                    isOn: showMetrics
+                ) {
+                    showMetrics.toggle()
+                    if !showMetrics && !showSessions { showSessions = true }
                 }
 
                 MenuToggleRow(
