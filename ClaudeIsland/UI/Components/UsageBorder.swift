@@ -27,14 +27,24 @@ struct UsageBorder: View {
         .allowsHitTesting(false)
     }
 
-    /// Hide the top edge and the top corner curves: only the sides and the bottom carry the border.
+    /// Hide only the flat top edge: the top corner curves, the sides and the bottom carry the border.
     private var belowTopEdge: some View {
         GeometryReader { geo in
-            let cut = shape.topCornerRadius + 2
-            Rectangle()
-                .frame(height: max(0, geo.size.height - cut))
-                .frame(maxHeight: .infinity, alignment: .bottom)
-                .frame(width: geo.size.width)
+            let cut: CGFloat = 4                              // the stroke is 3.5 pt wide, centred on the edge
+            let corner = shape.topCornerRadius + 1            // the top curves keep their progress
+            ZStack(alignment: .topLeading) {
+                // everything below the top edge
+                Rectangle()
+                    .frame(width: geo.size.width, height: max(0, geo.size.height - cut))
+                    .offset(y: cut)
+                // the two top corner curves
+                Rectangle()
+                    .frame(width: corner, height: cut)
+                Rectangle()
+                    .frame(width: corner, height: cut)
+                    .offset(x: geo.size.width - corner)
+            }
+            .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
         }
     }
 
