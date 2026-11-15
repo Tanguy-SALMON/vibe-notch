@@ -21,9 +21,21 @@ struct UsageBorder: View {
                 )
                 .mask(progressMask)
         }
+        .mask(belowTopEdge)
         .animation(.spring(response: 1.2, dampingFraction: 1.0), value: fraction)
         .animation(.easeInOut(duration: 1.0), value: color)
         .allowsHitTesting(false)
+    }
+
+    /// Hide the top edge and the top corner curves: only the sides and the bottom carry the border.
+    private var belowTopEdge: some View {
+        GeometryReader { geo in
+            let cut = shape.topCornerRadius + 2
+            Rectangle()
+                .frame(height: max(0, geo.size.height - cut))
+                .frame(maxHeight: .infinity, alignment: .bottom)
+                .frame(width: geo.size.width)
+        }
     }
 
     /// Reveal the stroke left-to-right across the width, so it fills along the bottom edge.
