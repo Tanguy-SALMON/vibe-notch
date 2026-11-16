@@ -81,15 +81,37 @@ final class UsageStore: ObservableObject {
     }
 
     /// Returns limits in the same shape the status line forwarder sends.
-    nonisolated private static func fetchUsage() async -> [String: Any]? {
-        guard let token = readAccessToken(),
-              let url = URL(string: "https://api.anthropic.com/api/oauth/usage") else { return nil }
+    /// The token is read from the Keychain once per launch and kept in memory (never written anywhere), so a plain
+    /// "Allow" answer to the Keychain prompt is asked once, not on every fetch. An expired token (401/403) is re-read once.
+    private final class TokenCache: @unchecked Sendable {
+        private let lock = NSLock()
+        private var token: String?
+        func get() -> String? { lock.lock(); defer { lock.unlock() }; return token }
+        func set(_ value: String?) { lock.lock(); token = value; lock.unlock() }
+    }
+    private static let tokenCache = TokenCache()
+
+    nonisolated private static func request(token: String) async -> (Data, Int)? {
+        guard let url = URL(string: "https://api.anthropic.com/api/oauth/usage") else { return nil }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
-
         guard let (data, response) = try? await URLSession.shared.data(for: request),
-              (response as? HTTPURLResponse)?.statusCode == 200,
+              let status = (response as? HTTPURLResponse)?.statusCode else { return nil }
+        return (data, status)
+    }
+
+    nonisolated private static func fetchUsage() async -> [String: Any]? {
+        guard let token = tokenCache.get() ?? readAccessToken() else { return nil }
+        tokenCache.set(token)
+        guard var (data, status) = await request(token: token) else { return nil }
+        if status == 401 || status == 403 {          // expired: read the current token from the Keychain once more
+            tokenCache.set(nil)
+            guard let fresh = readAccessToken(), let retry = await request(token: fresh) else { return nil }
+            tokenCache.set(fresh)
+            (data, status) = retry
+        }
+        guard status == 200,
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
 
         let iso = ISO8601DateFormatter()
