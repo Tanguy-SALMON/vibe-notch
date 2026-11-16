@@ -56,6 +56,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         windowManager = WindowManager()
         _ = windowManager?.setupNotchWindow()
         UsageStore.shared.refreshIfStale()
+        UsageStore.shared.startScheduler()
 
         screenObserver = ScreenObserver { [weak self] in
             self?.handleScreenChange()

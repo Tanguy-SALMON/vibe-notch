@@ -43,15 +43,43 @@ final class UsageStore: ObservableObject {
     private var lastFetch = Date.distantPast
     private var isFetching = false
 
-    /// Fetch usage from Anthropic's usage endpoint using Claude Code's login token.
-    /// Called at launch and whenever the notch is opened (no background polling), at most
-    /// once every 10 min (30s when under 20% remains). The status line feed (claw-notch-statusline.py) updates the same
+    /// Set by the notch view: true while any Claude session is processing.
+    var isActive = false
+    private var boostUntil = Date.distantPast
+    private var scheduler: Task<Void, Never>?
+
+    /// Refresh cadence: every minute for 10 minutes after the notch was clicked/opened, every 5 minutes while a
+    /// session is active, every 10 minutes otherwise (every 30 seconds whenever 20% or less of the quota remains).
+    private var currentInterval: TimeInterval {
+        let remaining = 100 - (fiveHour?.usedPercentage ?? 100)
+        var interval: TimeInterval = Date() < boostUntil ? 60 : (isActive ? 300 : 600)
+        if remaining <= 20 { interval = min(interval, 30) }
+        return interval
+    }
+
+    /// A cheap 30-second tick that only fetches when the current interval has elapsed (no work in between).
+    func startScheduler() {
+        guard scheduler == nil else { return }
+        scheduler = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 30 * 1_000_000_000)
+                self?.refreshIfStale()
+            }
+        }
+    }
+
+    /// The notch was clicked or opened: fetch now and keep refreshing every minute for the next 10 minutes.
+    func boost() {
+        boostUntil = Date().addingTimeInterval(600)
+        refreshIfStale(force: true)
+    }
+
+    /// Fetch usage from Anthropic's usage endpoint using Claude Code's login token, if the current interval has
+    /// elapsed (or `force`, with a 5s floor). The status line feed (claw-notch-statusline.py) updates the same
     /// store and acts as a fallback.
     func refreshIfStale(force: Bool = false) {
-        // Refresh at most every 10 min while more than 20% of the quota remains; every 30s otherwise.
-        let remaining = 100 - (fiveHour?.usedPercentage ?? 100)
-        let minInterval: TimeInterval = force ? 5 : (remaining > 20 ? 600 : 30)
-        guard !isFetching, Date().timeIntervalSince(lastFetch) > minInterval else { return }
+        let minInterval: TimeInterval = force ? 5 : currentInterval
+        guard !isFetching, Date().timeIntervalSince(lastFetch) >= minInterval - 1 else { return }
         isFetching = true
         lastFetch = Date()
         Task.detached(priority: .utility) { [weak self] in

@@ -214,13 +214,16 @@ struct NotchView: View {
         }
         .onChange(of: viewModel.status) { oldStatus, newStatus in
             if newStatus == .opened {
-                usageStore.refreshIfStale(force: true)
+                usageStore.boost()
                 ModelMetricsStore.shared.markOpened()
             }
             handleStatusChange(from: oldStatus, to: newStatus)
         }
         .onChange(of: sessionMonitor.pendingInstances) { _, sessions in
             handlePendingSessionsChange(sessions)
+        }
+        .onChange(of: isAnyProcessing) { _, active in
+            usageStore.isActive = active
         }
         .onChange(of: sessionMonitor.instances) { _, instances in
             handleProcessingChange()
