@@ -248,7 +248,7 @@ struct NotchView: View {
             // Header row - always present, contains crab and spinner that persist across states
             headerRow
                 // 2 pt taller than the hardware notch when compact, so our notch reads as a deliberate shape
-                .frame(height: max(24, closedNotchSize.height) + (viewModel.status == .opened ? 0 : 2))
+                .frame(height: max(24, closedNotchSize.height) + (viewModel.status == .opened ? 0 : 1))
 
             // Main content only when opened
             if viewModel.status == .opened {
