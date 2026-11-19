@@ -24,6 +24,9 @@ actor SessionStore {
     /// All sessions keyed by sessionId
     private var sessions: [String: SessionState] = [:]
 
+    /// Cached tmux ancestry per process (see tmuxStatus); pruned when the pid is no longer a live session
+    private var tmuxByPid: [Int: Bool] = [:]
+
     /// Pending file syncs (debounced)
     private var pendingSyncs: [String: Task<Void, Never>] = [:]
 
@@ -133,8 +136,7 @@ actor SessionStore {
 
         session.pid = event.pid
         if let pid = event.pid {
-            let tree = ProcessTreeBuilder.shared.buildTree()
-            session.isInTmux = ProcessTreeBuilder.shared.isInTmux(pid: pid, tree: tree)
+            session.isInTmux = tmuxStatus(pid: pid)
         }
         if let tty = event.tty {
             session.tty = tty.replacingOccurrences(of: "/dev/", with: "")
@@ -142,6 +144,7 @@ actor SessionStore {
         session.lastActivity = Date()
 
         if event.status == "ended" {
+            if let pid = event.pid { tmuxByPid.removeValue(forKey: pid) }
             sessions.removeValue(forKey: sessionId)
             cancelPendingSync(sessionId: sessionId)
             return
@@ -173,6 +176,16 @@ actor SessionStore {
         if event.shouldSyncFile {
             scheduleFileSync(sessionId: sessionId, cwd: event.cwd)
         }
+    }
+
+    /// A process's tmux ancestry is fixed for its lifetime, so `ps` (synchronous) runs once per pid
+    /// instead of on every hook event. Only a lookup that actually found the pid is cached.
+    private func tmuxStatus(pid: Int) -> Bool {
+        if let cached = tmuxByPid[pid] { return cached }
+        let tree = ProcessTreeBuilder.shared.buildTree()
+        let inTmux = ProcessTreeBuilder.shared.isInTmux(pid: pid, tree: tree)
+        if tree[pid] != nil { tmuxByPid[pid] = inTmux }
+        return inTmux
     }
 
     private func createSession(from event: HookEvent) -> SessionState {
@@ -1113,6 +1126,12 @@ actor SessionStore {
 
         if removedSession {
             publishState()
+        }
+
+        // Forget tmux lookups for pids that no longer belong to a session (pids get reused)
+        if !tmuxByPid.isEmpty {
+            let livePids = Set(sessions.values.compactMap(\.pid))
+            tmuxByPid = tmuxByPid.filter { livePids.contains($0.key) }
         }
     }
 

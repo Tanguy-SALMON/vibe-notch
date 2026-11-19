@@ -10,6 +10,9 @@
 //
 
 import SwiftUI
+#if DEBUG
+import os
+#endif
 
 struct CrabStage {
     let icon: ClaudeCrabIcon
@@ -117,6 +120,9 @@ struct CrabStage {
 
     /// Shows one props frame and holds it
     func frame(_ sprites: [AnticsSprite], _ seconds: Double = 0.1) async -> Bool {
+        #if DEBUG
+        CrabAnimationBudget.note(animated: 0, inLoop: false)
+        #endif
         antics.sprites = sprites
         return await pause(seconds)
     }
@@ -132,6 +138,9 @@ struct CrabStage {
 
     /// Short interpolated crab move (transform/opacity only)
     func pose(_ seconds: Double, _ change: () -> Void) {
+        #if DEBUG
+        CrabAnimationBudget.note(animated: seconds, inLoop: false)
+        #endif
         withAnimation(.easeOut(duration: seconds)) { change() }
     }
 
@@ -165,6 +174,9 @@ struct CrabStage {
     func units(_ points: CGFloat) -> CGFloat { points * motion * 52 / 14 }
 
     func springBack(_ response: Double = 0.32) {
+        #if DEBUG
+        CrabAnimationBudget.note(animated: response * 1.5, inLoop: false)
+        #endif
         withAnimation(.spring(response: response, dampingFraction: 0.55)) {
             scaleX = 1
             scaleY = 1
@@ -172,3 +184,28 @@ struct CrabStage {
         }
     }
 }
+
+#if DEBUG
+/// Debug-only CPU tripwire at the animation choke points (stage `frame` / `pose` / `springBack`,
+/// the calm `ease`): interpolations keep SwiftUI laying out every display frame, so a long one in a
+/// continuous loop, or more than 15% of wall time spent animating, is logged as a fault.
+enum CrabAnimationBudget {
+    private static let log = Logger(subsystem: "com.tanguysalmon.clawnotch", category: "AnimationBudget")
+    private static var windowStart = Date()
+    private static var animatedSeconds = 0.0
+
+    static func note(animated seconds: Double, inLoop: Bool) {
+        if inLoop, seconds > 0.6 {
+            log.fault("withAnimation of \(seconds, format: .fixed(precision: 2))s inside a continuous loop: step it instead")
+        }
+        animatedSeconds += seconds
+        let wall = Date().timeIntervalSince(windowStart)
+        guard wall >= 30 else { return }
+        if animatedSeconds / wall > 0.15 {
+            log.fault("Crab animated \(Int(animatedSeconds / wall * 100))% of the last \(Int(wall))s (budget 15%)")
+        }
+        windowStart = Date()
+        animatedSeconds = 0
+    }
+}
+#endif

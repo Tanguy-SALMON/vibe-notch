@@ -37,6 +37,10 @@ class NotchViewController: NSViewController {
 
     override func loadView() {
         hostingView = PassThroughHostingView(rootView: NotchView(viewModel: viewModel))
+        // The window frame is fixed (NotchWindowController sets it), so the hosting view never
+        // needs to push its content size into Auto Layout; skipping that saves constraint
+        // updates on every SwiftUI render.
+        hostingView.sizingOptions = []
 
         // Calculate the hit-test rect based on panel state
         hostingView.hitTestRect = { [weak self] in

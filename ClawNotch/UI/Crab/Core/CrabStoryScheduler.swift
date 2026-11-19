@@ -144,13 +144,9 @@ extension ClaudeCrabIcon {
         return !Task.isCancelled
     }
 
+    /// The Breathe base: stepped, never one long interpolation after another (see `ease`)
     private func anticsEase(to level: Double, scale: CGFloat = 1, over seconds: Double) async -> Bool {
-        withAnimation(.easeInOut(duration: seconds)) {
-            luminance = level
-            scaleX = 1 + (scale - 1) * 0.5
-            scaleY = scale
-        }
-        return await pause(seconds)
+        await ease(to: level, scale: scale, over: seconds)
     }
 
     /// Plays one story, then clears the props and eases the crab back to its rest pose.

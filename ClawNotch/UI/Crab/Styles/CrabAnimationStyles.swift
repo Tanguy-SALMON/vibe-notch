@@ -48,10 +48,10 @@ enum CrabEyes {
 
 // MARK: - Calm styles
 //
-// Micro-motion only: sub-point scale changes, opacity "breathing", soft blinks. Each loop wakes
-// about once per second or less and hands the interpolation to a single long `withAnimation`
-// (opacity / transform only, so the Canvas itself is not redrawn per frame). No legs, no hue,
-// no hops.
+// Micro-motion only: sub-point scale changes, opacity "breathing", soft blinks. Breaths and the
+// glass sheen are stepped (`ease` / `sweepSheen`, a few plain assignments per second), never one
+// long `withAnimation` after another: back-to-back interpolations keep SwiftUI re-laying out the
+// notch every display frame. No legs, no hue, no hops.
 
 extension ClaudeCrabIcon {
 
@@ -66,14 +66,26 @@ extension ClaudeCrabIcon {
         eyes = .open
     }
 
-    /// Animates brightness and breathing scale together, then sleeps for the same duration
-    private func ease(to level: Double, scale: CGFloat = 1, over seconds: Double) async -> Bool {
-        withAnimation(.easeInOut(duration: seconds)) {
-            luminance = level
-            scaleX = 1 + (scale - 1) * 0.5
-            scaleY = scale
+    /// Moves brightness and breathing scale to the target over `seconds` in a few smoothstep-spaced
+    /// plain steps (no `withAnimation`). Breathing loops chain these back to back, and a chain of
+    /// long interpolations keeps SwiftUI laying out every display frame (~6% CPU); stepping only
+    /// re-renders ~2.7 times a second (~1.1 in Calm). Amplitudes are small, so steps read as soft.
+    func ease(to level: Double, scale: CGFloat = 1, over seconds: Double, steps: Int = 6) async -> Bool {
+        let fromLevel = luminance
+        let fromX = scaleX, toX = 1 + (scale - 1) * 0.5
+        let fromY = scaleY
+        #if DEBUG
+        CrabAnimationBudget.note(animated: 0, inLoop: true)
+        #endif
+        for step in 1...steps {
+            let t = Double(step) / Double(steps)
+            let eased = t * t * (3 - 2 * t)
+            luminance = fromLevel + (level - fromLevel) * eased
+            scaleX = fromX + (toX - fromX) * CGFloat(eased)
+            scaleY = fromY + (scale - fromY) * CGFloat(eased)
+            guard await pause(seconds / Double(steps)) else { return false }
         }
-        return await pause(seconds)
+        return true
     }
 
     /// Pincers glide up or down in a few small steps instead of snapping
@@ -210,11 +222,16 @@ extension ClaudeCrabIcon {
         }
     }
 
-    /// Glides the highlight band from off the left edge to off the right edge
-    private func sweepSheen(over seconds: Double) async -> Bool {
+    /// Moves the highlight band from off the left edge to off the right edge in smoothstep-spaced
+    /// plain steps (~4.4 Hz; no long interpolation, see `ease`)
+    private func sweepSheen(over seconds: Double, steps: Int = 8) async -> Bool {
         sheen = -1
-        withAnimation(.easeInOut(duration: seconds)) { sheen = 1 }
-        return await pause(seconds + 0.05)
+        for step in 1...steps {
+            let t = CGFloat(step) / CGFloat(steps)
+            sheen = -1 + 2 * t * t * (3 - 2 * t)
+            guard await pause(seconds / Double(steps)) else { return false }
+        }
+        return await pause(0.05)
     }
 }
 
