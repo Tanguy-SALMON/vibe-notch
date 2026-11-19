@@ -74,6 +74,11 @@ private extension CrabStage {
   function running inside the icon's single cancellable `.task`.
 - **<= 12 Hz**: step props with `frame` / `play` (10 Hz by default); interpolated moves
   (`pose`, `withAnimation`) only on the crab's transform / opacity, in short bursts.
+- **Never chain `withAnimation` back to back** in a loop (processing/idle/alert loops in
+  `Styles/`): continuous interpolation makes SwiftUI render and lay out the notch every display
+  frame (it cost ~6% CPU). Use `ease()`: ~6 small plain-assignment steps with `pause` between
+  them. Bounded one-shot animations of a few hundred ms are fine. DEBUG builds log a fault when
+  a long animation runs inside a continuous loop.
 - **No cleanup**: never reset the pose at the end. The runner (`performStory` in
   `CrabStoryScheduler.swift`) clears the props and eases the crab back to rest after every
   story, finished or cancelled.

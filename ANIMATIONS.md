@@ -1,6 +1,8 @@
-# ClawNotch — 99 crab animations
+# ClawNotch — crab animation catalogue
 
-Catalogue of mini-animations for the pixel crab in the notch.
+Catalogue of mini-animations for the pixel crab in the notch: 99 numbered ideas (1–99), 10 community ideas (100–109) and a backlog of longer scripted ones (bottom of the file).
+
+**Where things stand:** 24 stories are built (1–14, 100–109). The other ideas are 💡. Nobody has reviewed the built stories running on screen yet: only static prop frames and builds were checked. Use **Animation Debug** in the notch menu to review them one by one. See [Knowledge and lessons](#knowledge-and-lessons) for architecture, CPU findings and open work.
 
 - **Status:** ✅ implemented (style "Antics (stories)") · 💡 idea, not built yet
 - **Mood** = when it fits best: `idle` (nothing happening), `work` (a session is processing), `done` (session finished, waiting for input), `alert` (permission pending)
@@ -160,6 +162,39 @@ Catalogue of mini-animations for the pixel crab in the notch.
 
 Anything marked 💡 is open for edits: rename, merge or drop ideas by editing this file, then ask for the chosen numbers to be built.
 
+## Knowledge and lessons
+
+### Architecture (one file per story)
+- **Principle:** open/closed + one file, one responsibility. A story is data + one routine; it only talks to a narrow `CrabStage` facade, and a plain catalogue lists the stories.
+- **Layout:** `ClawNotch/UI/Crab/` → `Core/` (icon, stage, story type, catalogue, scheduler), `Styles/` (Breathe, Whisper, Glass, Classic, Sleepy, Dance, Bounce, Disco, Antics), `Props/` (sprite model + shared art), `Debug/` (Animation Debug), `Stories/<Category>/StoryNNN_Name.swift`.
+- **Add a story:** one new file + one line in `CrabStoryCatalog.all`. `scripts/check-crab-stories.sh` flags unlisted files; a DEBUG assert flags duplicate/unsorted entries. Template and rules: `ClawNotch/UI/Crab/README.md`.
+- **Known loose ends:** the 45 legacy prop shapes still live in two central switches (new stories can bring private art via `PropArt`); only `Tokens/` and `Community/` story folders exist so far.
+
+### Settings and modes
+- **Crab Style** picker (menu). Default **Breathe**; calm styles listed first.
+- **Calm Animation** (was "Mute"; same stored key `muteNotchAnimation`): everything runs ~2.5× slower and at 0.4× amplitude instead of stopping. The working spinner advances every 3rd tick.
+- **Animation Debug** (menu): list of all stories, ~2× preview crab, Previous / Replay / Next, Loop this one, Play all, 0.5× speed. The preview forces Antics for itself only and never changes the saved style. "Play all" shares the `crabAnticsDebugLoop` key and also loops the real notch crab when its style is Antics.
+- **Scheduler:** idle/waiting plays one random story every 45–120 s, working every 20–40 s, never the same one twice in a row; alert plays only alert-tagged stories (1, 3, 100, 101, 103, 106).
+
+### CPU findings (important)
+- **Symptom:** a steady ~6–8% (up to ~13%) while a Claude session was "processing", vs 0.0% in earlier builds. It was the same for every crab style and with Calm on.
+- **Wrong guess:** the working spinner (0.15 s timer, ~7 Hz). The profile showed only ~1 sample there.
+- **Real cause (sample-backed):** back-to-back `withAnimation(.easeInOut)` calls of 2–2.5 s in the processing loops (Breathe, Whisper, Glass, Antics) kept SwiftUI/CoreAnimation rendering and laying out the notch every display frame (`CA::Transaction::flush` → `NSHostingView.layout` → `AnimatorState.update`).
+- **Fix applied:** continuous loops now use ~6 small plain-assignment steps per half-breath with `pause` between them (`ease()` in `CrabAnimationStyles.swift`); `hostingView.sizingOptions = []` (the window has a fixed hand-set frame); the tmux check is cached per pid (it used to spawn `ps` on every hook event).
+- **Result:** ~6.4% → ~2.8–3.5% while processing (Calm: ~1.7–2.2%). The ≤1.5% target is **not met yet**. Likely remaining floor: the spinner redraw (~7 Hz) — slowing it to ~3 Hz is the next thing to try.
+- **Rules learned:** never chain `withAnimation` back to back in a loop; step values instead. Short one-shot bursts (a few hundred ms) are fine. `drawingGroup()` / `.equatable()` on the 14 pt crab would not help. DEBUG builds log a fault if a long animation runs inside a continuous loop.
+- **Measure:** `top -l 8 -s 2 -pid $(pgrep -x ClawNotch) -stats pid,cpu` (ignore the first line), and `/usr/bin/sample $(pgrep -x ClawNotch) 8 1 -file /tmp/cn.txt` (plain `sample` is shadowed by a python script on this machine). `ps %cpu` is a lagging average and misleading right after launch.
+
+### Visual risks to eyeball
+- After the CPU fix, the Glass sheen (8 steps), alert pulses and Breathe move in small steps and may look slightly choppy. If so, raise the step count a little or use a layer-backed CoreAnimation for the breathing.
+- Props must stay legible at ~14 pt: text labels ("429", "API", "GPU 99°C") are coloured-block hints on purpose.
+
+### Open work
+1. Slow the spinner to ~3 Hz and re-measure; target ≤ 1.5% while processing.
+2. Review all 24 stories in Animation Debug and note which look wrong.
+3. Build the backlog below and the 💡 ideas (see Suggested build order).
+4. Optional: move the 45 legacy prop kinds into per-story or per-category art files.
+
 ## 9. Community ideas (100–109)
 
 Adapted to the pixel crab: no sound, labels ("429", "API", "GPU 99°C") become coloured-block hints, the "white starburst" is a small white sparkle, the mirror reflection is a generic grey chat-bot bubble.
@@ -177,6 +212,9 @@ Adapted to the pixel crab: no sound, labels ("429", "API", "GPU 99°C") become c
 | 108 | Logo Swap Ambush | Crab walks past a mirror; the reflection is a generic grey chat-bot bubble; they wave; the reflection pulls the crab into the mirror; it pops out as a tiny orange ghost with a white sparkle halo | idle | ✅ |
 | 109 | Ctrl+Z Undeath | Crab trips over an "API" cable (blue plug), falls flat and flatlines; a giant hand presses an Undo key; the crab un-flattens, blinks, and immediately trips again | done | ✅ |
 
+## 10. Backlog: longer scripted ideas (unbuilt, unnumbered)
+
+The ideas below were pasted as-is (5–9 s each, original wording kept). They are longer than the 2–4 s rule and use sound and text, so each needs trimming and adapting to the pixel crab before it gets a number (110+). Start with: Token Shredder, 4-Bit Hydraulic Press.
 
 
 . The Token Shredder — 7s
