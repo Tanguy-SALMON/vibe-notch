@@ -13,12 +13,12 @@ KEYS_DIR="$PROJECT_DIR/.sparkle-keys"
 GITHUB_REPO="farouqaldori/vibe-notch"
 
 # Website repo for auto-updating appcast
-WEBSITE_DIR="${CLAW_NOTCH_WEBSITE:-$PROJECT_DIR/../ClawNotch-website}"
+WEBSITE_DIR="${NOTCHD_WEBSITE:-$PROJECT_DIR/../Notchd-website}"
 WEBSITE_PUBLIC="$WEBSITE_DIR/public"
 
-APP_PATH="$EXPORT_PATH/ClawNotch.app"
-APP_NAME="ClawNotch"
-KEYCHAIN_PROFILE="ClawNotch"
+APP_PATH="$EXPORT_PATH/Notchd.app"
+APP_NAME="Notchd"
+KEYCHAIN_PROFILE="Notchd"
 
 echo "=== Creating Release ==="
 echo ""
@@ -100,17 +100,17 @@ fi
 if command -v create-dmg &> /dev/null; then
     echo "Using create-dmg for prettier output..."
     create-dmg \
-        --volname "ClawNotch" \
+        --volname "Notchd" \
         --window-size 600 400 \
         --icon-size 100 \
-        --icon "ClawNotch.app" 150 200 \
+        --icon "Notchd.app" 150 200 \
         --app-drop-link 450 200 \
-        --hide-extension "ClawNotch.app" \
+        --hide-extension "Notchd.app" \
         "$DMG_PATH" \
         "$APP_PATH"
 else
     echo "Using hdiutil (install create-dmg for prettier DMG: brew install create-dmg)"
-    hdiutil create -volname "ClawNotch" \
+    hdiutil create -volname "Notchd" \
         -srcfolder "$APP_PATH" \
         -ov -format UDZO \
         "$DMG_PATH"
@@ -144,7 +144,7 @@ SPARKLE_SIGN=""
 GENERATE_APPCAST=""
 
 POSSIBLE_PATHS=(
-    "$HOME/Library/Developer/Xcode/DerivedData/ClawNotch-*/SourcePackages/artifacts/sparkle/Sparkle/bin"
+    "$HOME/Library/Developer/Xcode/DerivedData/Notchd-*/SourcePackages/artifacts/sparkle/Sparkle/bin"
 )
 
 for path_pattern in "${POSSIBLE_PATHS[@]}"; do
@@ -215,16 +215,16 @@ else
         echo "Creating release v$VERSION..."
         gh release create "v$VERSION" "$DMG_PATH" \
             --repo "$GITHUB_REPO" \
-            --title "ClawNotch v$VERSION" \
-            --notes "## ClawNotch v$VERSION
+            --title "Notchd v$VERSION" \
+            --notes "## Notchd v$VERSION
 
 ### Installation
 1. Download \`$APP_NAME-$VERSION.dmg\`
-2. Open the DMG and drag ClawNotch to Applications
-3. Launch ClawNotch from Applications
+2. Open the DMG and drag Notchd to Applications
+3. Launch Notchd from Applications
 
 ### Auto-updates
-After installation, ClawNotch will automatically check for updates."
+After installation, Notchd will automatically check for updates."
     fi
 
     GITHUB_DOWNLOAD_URL="https://github.com/$GITHUB_REPO/releases/download/v$VERSION/$APP_NAME-$VERSION.dmg"
@@ -271,7 +271,7 @@ EOF
     # repo is disabled, so git push is no longer an option).
     cd "$WEBSITE_DIR" || exit 1
 
-    WRANGLER_PROJECT="${CLAW_NOTCH_WRANGLER_PROJECT:-vibenotch-website}"
+    WRANGLER_PROJECT="${NOTCHD_WRANGLER_PROJECT:-vibenotch-website}"
 
     read -p "Deploy website to Cloudflare Pages ($WRANGLER_PROJECT)? (Y/n) " -n 1 -r
     echo

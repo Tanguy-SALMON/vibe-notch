@@ -3,7 +3,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CRAB_DIR="$(dirname "$SCRIPT_DIR")/ClawNotch/UI/Crab"
+CRAB_DIR="$(dirname "$SCRIPT_DIR")/Notchd/UI/Crab"
 
 # `static let name = CrabStory(` in the story files
 declared=$(grep -rhoE 'static let [A-Za-z0-9_]+ = CrabStory\(' "$CRAB_DIR/Stories" | awk '{print $3}' | sort)

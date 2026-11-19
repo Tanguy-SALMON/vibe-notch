@@ -31,7 +31,7 @@ GENERATE_KEYS=""
 
 # Check common locations
 POSSIBLE_PATHS=(
-    "$HOME/Library/Developer/Xcode/DerivedData/ClawNotch-*/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys"
+    "$HOME/Library/Developer/Xcode/DerivedData/Notchd-*/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys"
     "/usr/local/bin/generate_keys"
     "$PROJECT_DIR/.build/artifacts/sparkle/Sparkle/bin/generate_keys"
 )

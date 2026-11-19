@@ -1,4 +1,4 @@
-# ClawNotch — crab animation catalogue
+# Notchd — crab animation catalogue
 
 Catalogue of mini-animations for the pixel crab in the notch: 99 numbered ideas (1–99), 10 community ideas (100–109) and a backlog of longer scripted ones (bottom of the file).
 
@@ -9,7 +9,7 @@ Catalogue of mini-animations for the pixel crab in the notch: 99 numbered ideas 
 - **Rules for every animation:** ≤ ~3–4 s long, played rarely (idle: every 45–120 s, work: every 20–40 s), ~0% CPU between plays, must respect **Calm Animation** (2.5× slower, 0.4× amplitude), props stay within a few points of the crab, no trademarked art (generic shapes only).
 - **Token** = a small orange pixel square, sometimes with a tiny glyph.
 
-> To build one: create `ClawNotch/UI/Crab/Stories/<Category>/StoryNNN_Name.swift` from the template in `ClawNotch/UI/Crab/README.md` (one file per story: metadata + a `private extension CrabStage` routine), add one line for it in `CrabStoryCatalog.all` (`ClawNotch/UI/Crab/Core/CrabStoryCatalog.swift`), then review it in the notch menu under **Animation Debug** (pick a story, Replay / Previous / Next, Loop this one, Play all, 0.5x).
+> To build one: create `Notchd/UI/Crab/Stories/<Category>/StoryNNN_Name.swift` from the template in `Notchd/UI/Crab/README.md` (one file per story: metadata + a `private extension CrabStage` routine), add one line for it in `CrabStoryCatalog.all` (`Notchd/UI/Crab/Core/CrabStoryCatalog.swift`), then review it in the notch menu under **Animation Debug** (pick a story, Replay / Previous / Next, Loop this one, Play all, 0.5x).
 
 ---
 
@@ -166,8 +166,8 @@ Anything marked 💡 is open for edits: rename, merge or drop ideas by editing t
 
 ### Architecture (one file per story)
 - **Principle:** open/closed + one file, one responsibility. A story is data + one routine; it only talks to a narrow `CrabStage` facade, and a plain catalogue lists the stories.
-- **Layout:** `ClawNotch/UI/Crab/` → `Core/` (icon, stage, story type, catalogue, scheduler), `Styles/` (Breathe, Whisper, Glass, Classic, Sleepy, Dance, Bounce, Disco, Antics), `Props/` (sprite model + shared art), `Debug/` (Animation Debug), `Stories/<Category>/StoryNNN_Name.swift`.
-- **Add a story:** one new file + one line in `CrabStoryCatalog.all`. `scripts/check-crab-stories.sh` flags unlisted files; a DEBUG assert flags duplicate/unsorted entries. Template and rules: `ClawNotch/UI/Crab/README.md`.
+- **Layout:** `Notchd/UI/Crab/` → `Core/` (icon, stage, story type, catalogue, scheduler), `Styles/` (Breathe, Whisper, Glass, Classic, Sleepy, Dance, Bounce, Disco, Antics), `Props/` (sprite model + shared art), `Debug/` (Animation Debug), `Stories/<Category>/StoryNNN_Name.swift`.
+- **Add a story:** one new file + one line in `CrabStoryCatalog.all`. `scripts/check-crab-stories.sh` flags unlisted files; a DEBUG assert flags duplicate/unsorted entries. Template and rules: `Notchd/UI/Crab/README.md`.
 - **Known loose ends:** the 45 legacy prop shapes still live in two central switches (new stories can bring private art via `PropArt`); only `Tokens/` and `Community/` story folders exist so far.
 
 ### Settings and modes
@@ -183,7 +183,7 @@ Anything marked 💡 is open for edits: rename, merge or drop ideas by editing t
 - **Fix applied:** continuous loops now use ~6 small plain-assignment steps per half-breath with `pause` between them (`ease()` in `CrabAnimationStyles.swift`); `hostingView.sizingOptions = []` (the window has a fixed hand-set frame); the tmux check is cached per pid (it used to spawn `ps` on every hook event).
 - **Result:** ~6.4% → ~2.8–3.5% while processing (Calm: ~1.7–2.2%). The ≤1.5% target is **not met yet**. Likely remaining floor: the spinner redraw (~7 Hz) — slowing it to ~3 Hz is the next thing to try.
 - **Rules learned:** never chain `withAnimation` back to back in a loop; step values instead. Short one-shot bursts (a few hundred ms) are fine. `drawingGroup()` / `.equatable()` on the 14 pt crab would not help. DEBUG builds log a fault if a long animation runs inside a continuous loop.
-- **Measure:** `top -l 8 -s 2 -pid $(pgrep -x ClawNotch) -stats pid,cpu` (ignore the first line), and `/usr/bin/sample $(pgrep -x ClawNotch) 8 1 -file /tmp/cn.txt` (plain `sample` is shadowed by a python script on this machine). `ps %cpu` is a lagging average and misleading right after launch.
+- **Measure:** `top -l 8 -s 2 -pid $(pgrep -x Notchd) -stats pid,cpu` (ignore the first line), and `/usr/bin/sample $(pgrep -x Notchd) 8 1 -file /tmp/cn.txt` (plain `sample` is shadowed by a python script on this machine). `ps %cpu` is a lagging average and misleading right after launch.
 
 ### Visual risks to eyeball
 - After the CPU fix, the Glass sheen (8 steps), alert pulses and Breathe move in small steps and may look slightly choppy. If so, raise the step count a little or use a layer-backed CoreAnimation for the breathing.

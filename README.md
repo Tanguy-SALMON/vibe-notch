@@ -1,6 +1,6 @@
 <div align="center">
-  <img src="ClawNotch/Assets.xcassets/AppIcon.appiconset/icon_128x128.png" alt="Logo" width="100" height="100">
-  <h3 align="center">ClawNotch (previously Vibe Notch, Claude Island)</h3>
+  <img src="Notchd/Assets.xcassets/AppIcon.appiconset/icon_128x128.png" alt="Logo" width="100" height="100">
+  <h3 align="center">Notchd (previously ClawNotch, Vibe Notch, Claude Island)</h3>
   <p align="center">
     A macOS menu bar app that brings Dynamic Island-style notifications to Claude Code CLI sessions.
     <br />
@@ -36,18 +36,18 @@
 Download the latest release or build from source:
 
 ```bash
-xcodebuild -scheme ClawNotch -configuration Release build
+xcodebuild -scheme Notchd -configuration Release build
 ```
 
 ## How It Works
 
-ClawNotch installs hooks into `~/.claude/hooks/` that communicate session state via a Unix socket. The app listens for events and displays them in the notch overlay.
+Notchd installs hooks into `~/.claude/hooks/` that communicate session state via a Unix socket. The app listens for events and displays them in the notch overlay.
 
 When Claude needs permission to run a tool, the notch expands with approve/deny buttons—no need to switch to the terminal.
 
 ## Analytics
 
-ClawNotch uses Mixpanel to collect anonymous usage data:
+Notchd uses Mixpanel to collect anonymous usage data:
 
 - **App Launched** — App version, build number, macOS version
 - **Session Started** — When a new Claude Code session is detected
