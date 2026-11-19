@@ -20,6 +20,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
+				UI/Crab/README.md,
 			);
 			target = FD33FD5C2EDF32D7002A6548 /* ClawNotch */;
 		};

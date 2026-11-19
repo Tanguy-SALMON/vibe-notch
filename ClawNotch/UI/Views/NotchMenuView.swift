@@ -97,11 +97,15 @@ struct NotchMenuView: View {
 
                 MenuToggleRow(
                     icon: "sparkles",
-                    label: "Mute Animation",
+                    label: "Calm Animation",
                     isOn: muteAnimation
                 ) {
                     muteAnimation.toggle()
                 }
+
+                CrabStylePickerRow()
+
+                AnimationDebugRow()
 
                 MenuToggleRow(
                     icon: "gauge.with.dots.needle.33percent",
@@ -286,6 +290,42 @@ struct MenuRow: View {
             return Color(red: 1.0, green: 0.4, blue: 0.4)
         }
         return .white.opacity(isHovered ? 1.0 : 0.7)
+    }
+}
+
+/// Crab animation style: a menu picker styled like the other rows, with a live preview crab
+struct CrabStylePickerRow: View {
+    @AppStorage(CrabAnimationStyle.defaultsKey) private var styleRaw = CrabAnimationStyle.fallback.rawValue
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ClaudeCrabIcon(size: 11, mood: .processing, anticsDemo: true)
+                .frame(width: 16)
+
+            Text("Crab Style")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(.white.opacity(isHovered ? 1.0 : 0.7))
+
+            Spacer()
+
+            Picker("Crab Style", selection: $styleRaw) {
+                ForEach(CrabAnimationStyle.allCases) { style in
+                    Text(style.displayName).tag(style.rawValue)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .controlSize(.small)
+            .fixedSize()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isHovered ? Color.white.opacity(0.08) : Color.clear)
+        )
+        .onHover { isHovered = $0 }
     }
 }
 
