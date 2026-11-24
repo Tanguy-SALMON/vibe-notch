@@ -351,8 +351,9 @@ struct ToolStatusDisplay {
             let time = r.durationSeconds >= 1 ?
                 "\(Int(r.durationSeconds))s" :
                 "\(Int(r.durationSeconds * 1000))ms"
-            let searchWord = r.results.count == 1 ? "search" : "searches"
-            return ToolStatusDisplay(text: "Did 1 \(searchWord) in \(time)", isRunning: false)
+            // One WebSearch call is always exactly one search; results.count is
+            // the number of hits, not searches.
+            return ToolStatusDisplay(text: "Did 1 search in \(time)", isRunning: false)
 
         case .askUserQuestion:
             return ToolStatusDisplay(text: "Answered", isRunning: false)

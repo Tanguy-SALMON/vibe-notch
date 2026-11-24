@@ -80,9 +80,12 @@ class JSONLInterruptWatcher {
             self?.checkForInterrupt()
         }
 
+        // Close the handle this source owns. Capturing it (rather than reading
+        // self.fileHandle) avoids closing a newer handle after a restart, and
+        // still closes the fd when cancel happens from deinit (self is nil).
         newSource.setCancelHandler { [weak self] in
-            try? self?.fileHandle?.close()
-            self?.fileHandle = nil
+            try? handle.close()
+            if self?.fileHandle === handle { self?.fileHandle = nil }
         }
 
         source = newSource

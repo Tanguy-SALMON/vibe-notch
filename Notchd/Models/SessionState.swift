@@ -274,19 +274,25 @@ struct SubagentState: Equatable, Sendable {
             description: description,
             subagentTools: []
         )
+        taskStack.removeAll { $0 == taskToolId }
+        taskStack.append(taskToolId)
     }
 
     /// Stop tracking a Task tool
     nonisolated mutating func stopTask(taskToolId: String) {
         activeTasks.removeValue(forKey: taskToolId)
+        taskStack.removeAll { $0 == taskToolId }
     }
 
     /// Add a subagent tool to the most recent active Task
     nonisolated mutating func addSubagentTool(_ tool: SubagentToolCall) {
         // Find most recent active task (for parallel Task support)
-        guard let mostRecentTaskId = activeTasks.keys.max(by: {
-            (activeTasks[$0]?.startTime ?? .distantPast) < (activeTasks[$1]?.startTime ?? .distantPast)
-        }) else { return }
+        // Use insertion order (taskStack), not timestamps: parallel Tasks can
+        // share identical/near-identical start times.
+        guard let mostRecentTaskId = taskStack.last(where: { activeTasks[$0] != nil })
+            ?? activeTasks.keys.max(by: {
+                (activeTasks[$0]?.startTime ?? .distantPast) < (activeTasks[$1]?.startTime ?? .distantPast)
+            }) else { return }
 
         activeTasks[mostRecentTaskId]?.subagentTools.append(tool)
     }
