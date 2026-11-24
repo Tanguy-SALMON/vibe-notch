@@ -8,8 +8,13 @@
 import AppKit
 import Combine
 
-class EventMonitors {
+@MainActor
+final class EventMonitors {
     static let shared = EventMonitors()
+
+    /// Tag written into `eventSourceUserData` of clicks we synthesize ourselves,
+    /// so our own monitors ignore them instead of handling them a second time.
+    static let syntheticEventTag: Int64 = 0x4E4F_5443_4844 // "NOTCHD"
 
     let mouseLocation = CurrentValueSubject<CGPoint, Never>(.zero)
     let mouseDown = PassthroughSubject<NSEvent, Never>()
@@ -22,26 +27,32 @@ class EventMonitors {
         setupMonitors()
     }
 
+    static func isSynthetic(_ event: NSEvent) -> Bool {
+        event.cgEvent?.getIntegerValueField(.eventSourceUserData) == syntheticEventTag
+    }
+
     private func setupMonitors() {
         mouseMoveMonitor = EventMonitor(mask: .mouseMoved) { [weak self] _ in
-            self?.mouseLocation.send(NSEvent.mouseLocation)
+            self?.sendMouseLocation()
         }
         mouseMoveMonitor?.start()
 
         mouseDownMonitor = EventMonitor(mask: .leftMouseDown) { [weak self] event in
+            guard !Self.isSynthetic(event) else { return }
             self?.mouseDown.send(event)
         }
         mouseDownMonitor?.start()
 
         mouseDraggedMonitor = EventMonitor(mask: .leftMouseDragged) { [weak self] _ in
-            self?.mouseLocation.send(NSEvent.mouseLocation)
+            self?.sendMouseLocation()
         }
         mouseDraggedMonitor?.start()
     }
 
-    deinit {
-        mouseMoveMonitor?.stop()
-        mouseDownMonitor?.stop()
-        mouseDraggedMonitor?.stop()
+    /// Skip duplicate positions so subscribers don't do work for no movement.
+    private func sendMouseLocation() {
+        let location = NSEvent.mouseLocation
+        guard location != mouseLocation.value else { return }
+        mouseLocation.send(location)
     }
 }

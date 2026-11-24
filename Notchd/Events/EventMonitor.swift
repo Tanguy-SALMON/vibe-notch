@@ -7,30 +7,36 @@
 
 import AppKit
 
-class EventMonitor {
-    private var globalMonitor: Any?
-    private var localMonitor: Any?
+@MainActor
+final class EventMonitor {
+    // nonisolated(unsafe) so the nonisolated deinit can remove the monitors.
+    // Only mutated on the main actor (start/stop) or in deinit (no other refs).
+    nonisolated(unsafe) private var globalMonitor: Any?
+    nonisolated(unsafe) private var localMonitor: Any?
     private let mask: NSEvent.EventTypeMask
-    private let handler: (NSEvent) -> Void
+    private let handler: @MainActor (NSEvent) -> Void
 
-    init(mask: NSEvent.EventTypeMask, handler: @escaping (NSEvent) -> Void) {
+    init(mask: NSEvent.EventTypeMask, handler: @escaping @MainActor (NSEvent) -> Void) {
         self.mask = mask
         self.handler = handler
     }
 
     deinit {
-        stop()
+        if let monitor = globalMonitor { NSEvent.removeMonitor(monitor) }
+        if let monitor = localMonitor { NSEvent.removeMonitor(monitor) }
     }
 
     func start() {
-        // Global monitor for events outside our app
+        guard globalMonitor == nil, localMonitor == nil else { return }
+
+        // Global monitor for events outside our app (delivered on the main thread)
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] event in
-            self?.handler(event)
+            MainActor.assumeIsolated { self?.handler(event) }
         }
 
-        // Local monitor for events inside our app
+        // Local monitor for events inside our app (delivered on the main thread)
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
-            self?.handler(event)
+            MainActor.assumeIsolated { self?.handler(event) }
             return event
         }
     }

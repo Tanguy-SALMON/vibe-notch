@@ -108,14 +108,20 @@ class NotchViewModel: ObservableObject {
 
     private func observeSelectors() {
         screenSelector.$isPickerExpanded
+            .removeDuplicates()
+            .dropFirst()
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
 
         soundSelector.$isPickerExpanded
+            .removeDuplicates()
+            .dropFirst()
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
 
         claudeDirSelector.$isPickerExpanded
+            .removeDuplicates()
+            .dropFirst()
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
     }
@@ -146,6 +152,9 @@ class NotchViewModel: ObservableObject {
 
     /// The chat session we're viewing (persists across close/open)
     private var currentChatSession: SessionState?
+
+    /// Pending auto-close scheduled by performBootAnimation
+    private var bootCloseWorkItem: DispatchWorkItem?
 
     private func handleMouseMove(_ location: CGPoint) {
         let inNotch = geometry.isPointInNotch(location)
@@ -199,29 +208,22 @@ class NotchViewModel: ObservableObject {
     private func repostClickAt(_ location: CGPoint) {
         // Small delay to let the window's ignoresMouseEvents update
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            // Convert to CGEvent coordinate system (screen coordinates with Y from top-left)
-            guard let screen = NSScreen.main else { return }
-            let screenHeight = screen.frame.height
-            let cgPoint = CGPoint(x: location.x, y: screenHeight - location.y)
+            // Convert to CGEvent (global, top-left origin) coordinates. Cocoa's global
+            // coordinate space is anchored to the primary screen (screens[0]), not
+            // NSScreen.main (the key window's screen), so flip against that height.
+            guard let primary = NSScreen.screens.first else { return }
+            let cgPoint = CGPoint(x: location.x, y: primary.frame.maxY - location.y)
 
-            // Create and post mouse down event
-            if let mouseDown = CGEvent(
-                mouseEventSource: nil,
-                mouseType: .leftMouseDown,
-                mouseCursorPosition: cgPoint,
-                mouseButton: .left
-            ) {
-                mouseDown.post(tap: .cghidEventTap)
-            }
-
-            // Create and post mouse up event
-            if let mouseUp = CGEvent(
-                mouseEventSource: nil,
-                mouseType: .leftMouseUp,
-                mouseCursorPosition: cgPoint,
-                mouseButton: .left
-            ) {
-                mouseUp.post(tap: .cghidEventTap)
+            for type in [CGEventType.leftMouseDown, .leftMouseUp] {
+                guard let event = CGEvent(
+                    mouseEventSource: nil,
+                    mouseType: type,
+                    mouseCursorPosition: cgPoint,
+                    mouseButton: .left
+                ) else { continue }
+                // Tag it so our own monitors ignore the synthetic click
+                event.setIntegerValueField(.eventSourceUserData, value: EventMonitors.syntheticEventTag)
+                event.post(tap: .cghidEventTap)
             }
         }
     }
@@ -249,6 +251,8 @@ class NotchViewModel: ObservableObject {
     }
 
     func notchClose() {
+        bootCloseWorkItem?.cancel()
+        bootCloseWorkItem = nil
         // Save chat session before closing if in chat mode
         if case .chat(let session) = contentType {
             currentChatSession = session
@@ -277,10 +281,15 @@ class NotchViewModel: ObservableObject {
 
     /// Perform boot animation: expand briefly then collapse
     func performBootAnimation() {
+        bootCloseWorkItem?.cancel()
         notchOpen(reason: .boot)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            guard let self = self, self.openReason == .boot else { return }
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            self.bootCloseWorkItem = nil
+            guard self.status == .opened, self.openReason == .boot else { return }
             self.notchClose()
         }
+        bootCloseWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: workItem)
     }
 }
