@@ -82,23 +82,10 @@ struct MCPToolFormatter {
         for key in sortedKeys.prefix(maxArgs) {
             guard let value = input[key] else { continue }
 
-            let truncatedValue: String
-            if value.count > maxValueLength {
-                truncatedValue = String(value.prefix(maxValueLength)) + "..."
-            } else {
-                truncatedValue = value
-            }
-
-            formattedParts.append("\(key): \"\(truncatedValue)\"")
+            formattedParts.append(formatArg(key: key, value: value, maxValueLength: maxValueLength))
         }
 
-        var result = formattedParts.joined(separator: ", ")
-
-        if sortedKeys.count > maxArgs {
-            result += ", ..."
-        }
-
-        return result
+        return joinArgs(formattedParts, totalCount: sortedKeys.count, maxArgs: maxArgs)
     }
 
     /// Formats tool input from Any dictionary (handles both String and non-String values)
@@ -122,22 +109,21 @@ struct MCPToolFormatter {
                 stringValue = String(describing: value)
             }
 
-            let truncatedValue: String
-            if stringValue.count > maxValueLength {
-                truncatedValue = String(stringValue.prefix(maxValueLength)) + "..."
-            } else {
-                truncatedValue = stringValue
-            }
-
-            formattedParts.append("\(key): \"\(truncatedValue)\"")
+            formattedParts.append(formatArg(key: key, value: stringValue, maxValueLength: maxValueLength))
         }
 
-        var result = formattedParts.joined(separator: ", ")
+        return joinArgs(formattedParts, totalCount: sortedKeys.count, maxArgs: maxArgs)
+    }
 
-        if sortedKeys.count > maxArgs {
-            result += ", ..."
-        }
+    private static func formatArg(key: String, value: String, maxValueLength: Int) -> String {
+        let truncatedValue = value.count > maxValueLength
+            ? String(value.prefix(maxValueLength)) + "..."
+            : value
+        return "\(key): \"\(truncatedValue)\""
+    }
 
-        return result
+    private static func joinArgs(_ parts: [String], totalCount: Int, maxArgs: Int) -> String {
+        let result = parts.joined(separator: ", ")
+        return totalCount > maxArgs ? result + ", ..." : result
     }
 }

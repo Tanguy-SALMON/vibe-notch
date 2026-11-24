@@ -97,16 +97,6 @@ struct BashResult: Equatable, Sendable {
     var hasOutput: Bool {
         !stdout.isEmpty || !stderr.isEmpty
     }
-
-    var displayOutput: String {
-        if !stdout.isEmpty {
-            return stdout
-        }
-        if !stderr.isEmpty {
-            return stderr
-        }
-        return "(No content)"
-    }
 }
 
 // MARK: - Grep Tool Result
@@ -342,10 +332,10 @@ struct ToolStatusDisplay {
             return ToolStatusDisplay(text: "Found \(r.numFiles) \(fileWord)", isRunning: false)
 
         case .glob(let r):
-            let fileWord = r.numFiles == 1 ? "file" : "files"
             if r.numFiles == 0 {
                 return ToolStatusDisplay(text: "No files found", isRunning: false)
             }
+            let fileWord = r.numFiles == 1 ? "file" : "files"
             return ToolStatusDisplay(text: "Found \(r.numFiles) \(fileWord)", isRunning: false)
 
         case .todoWrite:

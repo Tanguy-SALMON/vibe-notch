@@ -104,16 +104,11 @@ struct NotchView: View {
 
     private var notchSize: CGSize {
         switch viewModel.status {
-        case .closed, .popping:
+        case .closed:
             return closedNotchSize
         case .opened:
             return viewModel.openedSize
         }
-    }
-
-    /// Width of the closed content (notch + any expansion)
-    private var closedContentWidth: CGFloat {
-        closedNotchSize.width + expansionWidth
     }
 
     // MARK: - Corner Radii
@@ -470,7 +465,7 @@ struct NotchView: View {
 
     private func handleStatusChange(from oldStatus: NotchStatus, to newStatus: NotchStatus) {
         switch newStatus {
-        case .opened, .popping:
+        case .opened:
             isVisible = true
             // Clear waiting-for-input timestamps only when manually opened (user acknowledged)
             if viewModel.openReason == .click || viewModel.openReason == .hover {

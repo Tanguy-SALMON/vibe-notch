@@ -76,7 +76,7 @@ class NotchWindowController: NSWindowController {
                         NSApp.activate(ignoringOtherApps: false)
                         notchWindow?.makeKey()
                     }
-                case .closed, .popping:
+                case .closed:
                     // Ignore mouse events when closed so clicks pass through
                     notchWindow?.ignoresMouseEvents = true
                 }

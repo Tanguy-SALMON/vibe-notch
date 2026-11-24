@@ -48,36 +48,6 @@ class ChatHistoryManager: ObservableObject {
         await SessionStore.shared.process(.loadHistory(sessionId: sessionId, cwd: cwd))
     }
 
-    func syncFromFile(sessionId: String, cwd: String) async {
-        let messages = await ConversationParser.shared.parseFullConversation(
-            sessionId: sessionId,
-            cwd: cwd
-        )
-        let completedTools = await ConversationParser.shared.completedToolIds(for: sessionId)
-        let toolResults = await ConversationParser.shared.toolResults(for: sessionId)
-        let structuredResults = await ConversationParser.shared.structuredResults(for: sessionId)
-
-        let payload = FileUpdatePayload(
-            sessionId: sessionId,
-            cwd: cwd,
-            messages: messages,
-            isIncremental: false,  // Full sync
-            completedToolIds: completedTools,
-            toolResults: toolResults,
-            structuredResults: structuredResults
-        )
-
-        await SessionStore.shared.process(.fileUpdated(payload))
-    }
-
-    func clearHistory(for sessionId: String) {
-        jsonlParsedSessions.remove(sessionId)
-        histories.removeValue(forKey: sessionId)
-        Task {
-            await SessionStore.shared.process(.sessionEnded(sessionId: sessionId))
-        }
-    }
-
     // MARK: - State Updates
 
     private func updateFromSessions(_ sessions: [SessionState]) {
@@ -90,6 +60,8 @@ class ChatHistoryManager: ObservableObject {
         }
         histories = newHistories
         agentDescriptions = newAgentDescriptions
+        // Forget ended sessions so a resumed session (same id) reloads its JSONL history
+        jsonlParsedSessions.formIntersection(newHistories.keys)
     }
 
     private func filterOutSubagentTools(_ items: [ChatHistoryItem]) -> [ChatHistoryItem] {
@@ -147,31 +119,6 @@ struct ToolCallItem: Equatable, Sendable {
     /// ToolCallItem — e.g. when matching against `HookEvent.tool`).
     static func isSubagentContainerName(_ name: String?) -> Bool {
         name == "Task" || name == "Agent"
-    }
-
-    /// Preview text for the tool (input-based)
-    var inputPreview: String {
-        if let filePath = input["file_path"] ?? input["path"] {
-            return URL(fileURLWithPath: filePath).lastPathComponent
-        }
-        if let command = input["command"] {
-            let firstLine = command.components(separatedBy: "\n").first ?? command
-            return String(firstLine.prefix(60))
-        }
-        if let pattern = input["pattern"] {
-            return pattern
-        }
-        if let query = input["query"] {
-            return query
-        }
-        if let url = input["url"] {
-            return url
-        }
-        if let agentId = input["agentId"] {
-            let blocking = input["block"] == "true"
-            return blocking ? "Waiting..." : "Checking \(agentId.prefix(8))..."
-        }
-        return input.values.first.map { String($0.prefix(60)) } ?? ""
     }
 
     /// Status display text for the tool
@@ -240,56 +187,4 @@ struct SubagentToolCall: Equatable, Identifiable, Sendable {
     let input: [String: String]
     var status: ToolStatus
     let timestamp: Date
-
-    /// Short description for display
-    var displayText: String {
-        switch name {
-        case "Read":
-            if let path = input["file_path"] {
-                return URL(fileURLWithPath: path).lastPathComponent
-            }
-            return "Reading..."
-        case "Grep":
-            if let pattern = input["pattern"] {
-                return "grep: \(pattern)"
-            }
-            return "Searching..."
-        case "Glob":
-            if let pattern = input["pattern"] {
-                return "glob: \(pattern)"
-            }
-            return "Finding files..."
-        case "Bash":
-            if let desc = input["description"] {
-                return desc
-            }
-            if let cmd = input["command"] {
-                let firstLine = cmd.components(separatedBy: "\n").first ?? cmd
-                return String(firstLine.prefix(40))
-            }
-            return "Running command..."
-        case "Edit":
-            if let path = input["file_path"] {
-                return "Edit: \(URL(fileURLWithPath: path).lastPathComponent)"
-            }
-            return "Editing..."
-        case "Write":
-            if let path = input["file_path"] {
-                return "Write: \(URL(fileURLWithPath: path).lastPathComponent)"
-            }
-            return "Writing..."
-        case "WebFetch":
-            if let url = input["url"] {
-                return "Fetching: \(url.prefix(30))..."
-            }
-            return "Fetching..."
-        case "WebSearch":
-            if let query = input["query"] {
-                return "Search: \(query.prefix(30))"
-            }
-            return "Searching web..."
-        default:
-            return name
-        }
-    }
 }

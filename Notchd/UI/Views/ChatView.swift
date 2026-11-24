@@ -23,7 +23,6 @@ struct ChatView: View {
     @State private var isAutoscrollPaused: Bool = false
     @State private var newMessageCount: Int = 0
     @State private var previousHistoryCount: Int = 0
-    @State private var isBottomVisible: Bool = true
     @FocusState private var isInputFocused: Bool
 
     init(sessionId: String, initialSession: SessionState, sessionMonitor: ClaudeSessionMonitor, viewModel: NotchViewModel) {

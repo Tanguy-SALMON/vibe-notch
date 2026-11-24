@@ -12,7 +12,7 @@ struct ScreenPickerRow: View {
     @State private var isHovered = false
 
     private var isExpanded: Bool {
-        get { screenSelector.isPickerExpanded }
+        screenSelector.isPickerExpanded
     }
 
     private func setExpanded(_ value: Bool) {

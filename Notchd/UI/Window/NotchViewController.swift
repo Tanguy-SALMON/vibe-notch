@@ -44,7 +44,7 @@ class NotchViewController: NSViewController {
 
         // Calculate the hit-test rect based on panel state
         hostingView.hitTestRect = { [weak self] in
-            guard let self = self else { return .zero }
+            guard let self else { return .zero }
             let vm = self.viewModel
             let geometry = vm.geometry
 
@@ -65,7 +65,7 @@ class NotchViewController: NSViewController {
                     width: panelWidth,
                     height: panelHeight
                 )
-            case .closed, .popping:
+            case .closed:
                 // When closed, use the notch rect
                 let notchRect = geometry.deviceNotchRect
                 let screenWidth = geometry.screenRect.width

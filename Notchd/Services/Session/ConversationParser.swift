@@ -470,19 +470,20 @@ actor ConversationParser {
             state = IncrementalParseState()
         }
 
+        // Nothing new (or unreadable): report no new messages, not the whole history
         if fileSize == state.lastFileOffset {
-            return state.messages
+            return []
         }
 
         do {
             try fileHandle.seek(toOffset: state.lastFileOffset)
         } catch {
-            return state.messages
+            return []
         }
 
         guard let newData = try? fileHandle.readToEnd(),
               let newContent = String(data: newData, encoding: .utf8) else {
-            return state.messages
+            return []
         }
 
         state.clearPending = false
@@ -572,22 +573,6 @@ actor ConversationParser {
     /// Get structured tool results for a session
     func structuredResults(for sessionId: String) -> [String: ToolResultData] {
         return incrementalState[sessionId]?.structuredResults ?? [:]
-    }
-
-    /// Reset incremental state for a session (call when reloading)
-    func resetState(for sessionId: String) {
-        incrementalState.removeValue(forKey: sessionId)
-    }
-
-    /// Check if a /clear command was detected during the last parse
-    /// Returns true once and consumes the pending flag
-    func checkAndConsumeClearDetected(for sessionId: String) -> Bool {
-        guard var state = incrementalState[sessionId], state.clearPending else {
-            return false
-        }
-        state.clearPending = false
-        incrementalState[sessionId] = state
-        return true
     }
 
     /// Build session file path
@@ -1130,87 +1115,4 @@ struct SubagentToolInfo: Sendable {
     let input: [String: String]
     let isCompleted: Bool
     let timestamp: String?
-}
-
-// MARK: - Static Subagent Tools Parsing
-
-extension ConversationParser {
-    /// Parse subagent tools from an agent JSONL file (static, synchronous version)
-    nonisolated static func parseSubagentToolsSync(sessionId: String, agentId: String, cwd: String) -> [SubagentToolInfo] {
-        guard !agentId.isEmpty else { return [] }
-
-        let projectDir = cwd.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ".", with: "-")
-        let agentFile = subagentFilePath(sessionId: sessionId, agentId: agentId, projectDir: projectDir)
-
-        guard FileManager.default.fileExists(atPath: agentFile),
-              let content = try? String(contentsOfFile: agentFile, encoding: .utf8) else {
-            return []
-        }
-
-        var tools: [SubagentToolInfo] = []
-        var seenToolIds: Set<String> = []
-        var completedToolIds: Set<String> = []
-
-        for line in content.components(separatedBy: "\n") where !line.isEmpty {
-            if line.contains("\"tool_result\""),
-               let lineData = line.data(using: .utf8),
-               let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
-               let messageDict = json["message"] as? [String: Any],
-               let contentArray = messageDict["content"] as? [[String: Any]] {
-                for block in contentArray {
-                    if block["type"] as? String == "tool_result",
-                       let toolUseId = block["tool_use_id"] as? String {
-                        completedToolIds.insert(toolUseId)
-                    }
-                }
-            }
-        }
-
-        for line in content.components(separatedBy: "\n") where !line.isEmpty {
-            guard line.contains("\"tool_use\""),
-                  let lineData = line.data(using: .utf8),
-                  let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
-                  let messageDict = json["message"] as? [String: Any],
-                  let contentArray = messageDict["content"] as? [[String: Any]] else {
-                continue
-            }
-
-            for block in contentArray {
-                guard block["type"] as? String == "tool_use",
-                      let toolId = block["id"] as? String,
-                      let toolName = block["name"] as? String,
-                      !seenToolIds.contains(toolId) else {
-                    continue
-                }
-
-                seenToolIds.insert(toolId)
-
-                var input: [String: String] = [:]
-                if let inputDict = block["input"] as? [String: Any] {
-                    for (key, value) in inputDict {
-                        if let strValue = value as? String {
-                            input[key] = strValue
-                        } else if let intValue = value as? Int {
-                            input[key] = String(intValue)
-                        } else if let boolValue = value as? Bool {
-                            input[key] = boolValue ? "true" : "false"
-                        }
-                    }
-                }
-
-                let isCompleted = completedToolIds.contains(toolId)
-                let timestamp = json["timestamp"] as? String
-
-                tools.append(SubagentToolInfo(
-                    id: toolId,
-                    name: toolName,
-                    input: input,
-                    isCompleted: isCompleted,
-                    timestamp: timestamp
-                ))
-            }
-        }
-
-        return tools
-    }
 }

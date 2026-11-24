@@ -48,7 +48,7 @@ class NotchActivityCoordinator: ObservableObject {
     }
 
     /// Duration before auto-hiding the activity
-    var activityDuration: TimeInterval = 0 // 0 = manual control (won't auto-hide)
+    private var activityDuration: TimeInterval = 0 // 0 = manual control (won't auto-hide)
 
     // MARK: - Private
 
@@ -79,15 +79,6 @@ class NotchActivityCoordinator: ObservableObject {
     func hideActivity() {
         withAnimation(.smooth) {
             expandingActivity = .empty
-        }
-    }
-
-    /// Toggle activity visibility
-    func toggleActivity(type: NotchActivityType, value: CGFloat = 0) {
-        if expandingActivity.show && expandingActivity.type == type {
-            hideActivity()
-        } else {
-            showActivity(type: type, value: value)
         }
     }
 

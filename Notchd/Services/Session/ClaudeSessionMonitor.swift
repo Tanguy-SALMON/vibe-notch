@@ -134,15 +134,6 @@ class ClaudeSessionMonitor: ObservableObject {
         instances = sessions
         pendingInstances = sessions.filter { $0.needsAttention }
     }
-
-    // MARK: - History Loading (for UI)
-
-    /// Request history load for a session
-    func loadHistory(sessionId: String, cwd: String) {
-        Task {
-            await SessionStore.shared.process(.loadHistory(sessionId: sessionId, cwd: cwd))
-        }
-    }
 }
 
 // MARK: - Interrupt Watcher Delegate

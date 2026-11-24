@@ -113,10 +113,6 @@ actor SessionStore {
 
         case .subagentStopped(let sessionId, let taskToolId):
             processSubagentStopped(sessionId: sessionId, taskToolId: taskToolId)
-
-        case .agentFileUpdated:
-            // No longer used - subagent tools are populated from JSONL completion
-            break
         }
 
         publishState()
@@ -1152,19 +1148,5 @@ actor SessionStore {
     /// Get a specific session
     func session(for sessionId: String) -> SessionState? {
         sessions[sessionId]
-    }
-
-    /// Check if there's an active permission for a session
-    func hasActivePermission(sessionId: String) -> Bool {
-        guard let session = sessions[sessionId] else { return false }
-        if case .waitingForApproval = session.phase {
-            return true
-        }
-        return false
-    }
-
-    /// Get all current sessions
-    func allSessions() -> [SessionState] {
-        Array(sessions.values)
     }
 }

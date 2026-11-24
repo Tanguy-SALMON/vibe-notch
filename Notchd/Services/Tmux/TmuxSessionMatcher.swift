@@ -46,7 +46,7 @@ actor TmuxSessionMatcher {
             let sessionId = sessionUrl.deletingPathExtension().lastPathComponent
             let score = countMatchingSnippets(snippets: snippets, inFile: sessionUrl)
 
-            if score > 0 && (bestMatch == nil || score > bestMatch!.score) {
+            if score > (bestMatch?.score ?? 0) {
                 bestMatch = (sessionId, score)
             }
         }

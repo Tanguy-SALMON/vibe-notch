@@ -27,16 +27,6 @@ struct ChatMessage: Identifiable, Equatable {
     static func == (lhs: ChatMessage, rhs: ChatMessage) -> Bool {
         lhs.id == rhs.id
     }
-
-    /// Plain text content combined
-    var textContent: String {
-        content.compactMap { block in
-            if case .text(let text) = block {
-                return text
-            }
-            return nil
-        }.joined(separator: "\n")
-    }
 }
 
 enum ChatRole: String, Equatable {

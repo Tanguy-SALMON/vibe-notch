@@ -199,17 +199,4 @@ class InterruptWatcherManager {
         watchers[sessionId]?.stop()
         watchers.removeValue(forKey: sessionId)
     }
-
-    /// Stop all watchers
-    func stopAll() {
-        for (_, watcher) in watchers {
-            watcher.stop()
-        }
-        watchers.removeAll()
-    }
-
-    /// Check if we're watching a session
-    func isWatching(sessionId: String) -> Bool {
-        watchers[sessionId] != nil
-    }
 }

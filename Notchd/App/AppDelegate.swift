@@ -9,10 +9,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     static var shared: AppDelegate?
 
-    var windowController: NotchWindowController? {
-        windowManager?.windowController
-    }
-
     override init() {
         super.init()
         AppDelegate.shared = self
@@ -75,7 +71,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         screenObserver = ScreenObserver { [weak self] in
             self?.handleScreenChange()
         }
-
     }
 
     private func handleScreenChange() {
@@ -135,12 +130,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             ) else { continue }
 
             for file in files where file.pathExtension == "jsonl" && !file.lastPathComponent.hasPrefix("agent-") {
-                if let attrs = try? file.resourceValues(forKeys: [.contentModificationDateKey]),
-                   let modDate = attrs.contentModificationDate {
-                    if latestDate == nil || modDate > latestDate! {
-                        latestDate = modDate
-                        latestFile = file
-                    }
+                if let modDate = try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+                   latestDate.map({ modDate > $0 }) ?? true {
+                    latestDate = modDate
+                    latestFile = file
                 }
             }
         }

@@ -19,18 +19,17 @@ struct PermissionContext: Sendable {
     var formattedInput: String? {
         guard let input = toolInput else { return nil }
 
+        func truncated(_ s: String) -> String {
+            s.count > 100 ? String(s.prefix(100)) + "..." : s
+        }
+
         // For Bash, prioritize showing the command
         if toolName == "Bash", let command = input["command"]?.value as? String {
-            return command.count > 100 ? String(command.prefix(100)) + "..." : command
+            return truncated(command)
         }
 
-        // For Write/Edit, show the file path
-        if toolName == "Write" || toolName == "Edit", let path = input["file_path"]?.value as? String {
-            return URL(fileURLWithPath: path).lastPathComponent
-        }
-
-        // For Read, show the file path
-        if toolName == "Read", let path = input["file_path"]?.value as? String {
+        // For Write/Edit/Read, show the file name
+        if ["Write", "Edit", "Read"].contains(toolName), let path = input["file_path"]?.value as? String {
             return URL(fileURLWithPath: path).lastPathComponent
         }
 
@@ -38,14 +37,14 @@ struct PermissionContext: Sendable {
         let priorityKeys = ["command", "file_path", "path", "query", "pattern", "url"]
         for key in priorityKeys {
             if let value = input[key]?.value as? String {
-                return value.count > 100 ? String(value.prefix(100)) + "..." : value
+                return truncated(value)
             }
         }
 
         // Fallback: first non-description string
         for (key, value) in input where key != "description" {
             if let str = value.value as? String {
-                return str.count > 100 ? String(str.prefix(100)) + "..." : str
+                return truncated(str)
             }
         }
 
@@ -145,25 +144,10 @@ enum SessionPhase: Sendable {
         }
     }
 
-    /// Attempt to transition to a new phase, returns the new phase if valid
-    nonisolated func transition(to next: SessionPhase) -> SessionPhase? {
-        canTransition(to: next) ? next : nil
-    }
-
     /// Whether this phase indicates the session needs user attention
     var needsAttention: Bool {
         switch self {
         case .waitingForApproval, .waitingForInput:
-            return true
-        default:
-            return false
-        }
-    }
-
-    /// Whether this phase indicates active processing
-    var isActive: Bool {
-        switch self {
-        case .processing, .compacting:
             return true
         default:
             return false

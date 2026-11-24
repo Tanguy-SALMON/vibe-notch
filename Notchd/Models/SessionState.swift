@@ -129,19 +129,9 @@ struct SessionState: Equatable, Identifiable, Sendable {
         conversationInfo.summary ?? conversationInfo.firstUserMessage ?? projectName
     }
 
-    /// Best hint for matching window title
-    var windowHint: String {
-        conversationInfo.summary ?? projectName
-    }
-
     /// Pending tool name if waiting for approval
     var pendingToolName: String? {
         activePermission?.toolName
-    }
-
-    /// Pending tool use ID
-    var pendingToolId: String? {
-        activePermission?.toolUseId
     }
 
     /// Formatted pending tool input for display
@@ -183,11 +173,6 @@ struct SessionState: Equatable, Identifiable, Sendable {
     var usage: UsageInfo {
         conversationInfo.usage
     }
-
-    /// Whether the session can be interacted with
-    var canInteract: Bool {
-        phase.needsAttention
-    }
 }
 
 // MARK: - Tool Tracker
@@ -221,11 +206,6 @@ struct ToolTracker: Equatable, Sendable {
     /// Mark a tool ID as seen, returns true if it was new
     nonisolated mutating func markSeen(_ id: String) -> Bool {
         seenIds.insert(id).inserted
-    }
-
-    /// Check if a tool ID has been seen
-    nonisolated func hasSeen(_ id: String) -> Bool {
-        seenIds.contains(id)
     }
 
     /// Start tracking a tool
@@ -299,24 +279,6 @@ struct SubagentState: Equatable, Sendable {
     /// Stop tracking a Task tool
     nonisolated mutating func stopTask(taskToolId: String) {
         activeTasks.removeValue(forKey: taskToolId)
-    }
-
-    /// Set the agentId for a Task (called when agent file is discovered)
-    nonisolated mutating func setAgentId(_ agentId: String, for taskToolId: String) {
-        activeTasks[taskToolId]?.agentId = agentId
-        if let description = activeTasks[taskToolId]?.description {
-            agentDescriptions[agentId] = description
-        }
-    }
-
-    /// Add a subagent tool to a specific Task by ID
-    nonisolated mutating func addSubagentToolToTask(_ tool: SubagentToolCall, taskId: String) {
-        activeTasks[taskId]?.subagentTools.append(tool)
-    }
-
-    /// Set all subagent tools for a specific Task (used when updating from agent file)
-    nonisolated mutating func setSubagentTools(_ tools: [SubagentToolCall], for taskId: String) {
-        activeTasks[taskId]?.subagentTools = tools
     }
 
     /// Add a subagent tool to the most recent active Task

@@ -24,7 +24,7 @@ private final class DocumentCache: @unchecked Sendable {
         if let cached = cache[text] {
             return cached
         }
-        // Enable strikethrough and other extended syntax
+        // Strikethrough (GFM) is parsed by default; these options add block directives and symbol links
         let doc = Document(parsing: text, options: [.parseBlockDirectives, .parseSymbolLinks])
         if cache.count >= maxSize {
             cache.removeAll()
@@ -236,14 +236,6 @@ private struct InlineRenderer: View {
         } else {
             return SwiftUI.Text(inline.plainText).foregroundColor(baseColor)
         }
-    }
-
-    private func renderChildren(_ children: [InlineMarkup]) -> SwiftUI.Text {
-        var result = SwiftUI.Text("")
-        for child in children {
-            result = result + renderInline(child)
-        }
-        return result
     }
 }
 

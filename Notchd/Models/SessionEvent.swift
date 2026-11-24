@@ -57,9 +57,6 @@ enum SessionEvent: Sendable {
     /// A Task (subagent) tool has stopped
     case subagentStopped(sessionId: String, taskToolId: String)
 
-    /// Agent file was updated with new subagent tools (from AgentFileWatcher)
-    case agentFileUpdated(sessionId: String, taskToolId: String, tools: [SubagentToolInfo])
-
     // MARK: - Clear Events (from JSONL detection)
 
     /// User issued /clear command - reset UI state while keeping session alive
@@ -162,11 +159,6 @@ extension HookEvent {
         }
     }
 
-    /// Whether this is a tool-related event
-    nonisolated var isToolEvent: Bool {
-        event == "PreToolUse" || event == "PostToolUse" || event == "PermissionRequest"
-    }
-
     /// Whether this event should trigger a file sync
     nonisolated var shouldSyncFile: Bool {
         switch event {
@@ -213,8 +205,6 @@ extension SessionEvent: CustomStringConvertible {
             return "subagentToolCompleted(session: \(sessionId.prefix(8)), tool: \(toolId.prefix(12)), status: \(status))"
         case .subagentStopped(let sessionId, let taskToolId):
             return "subagentStopped(session: \(sessionId.prefix(8)), task: \(taskToolId.prefix(12)))"
-        case .agentFileUpdated(let sessionId, let taskToolId, let tools):
-            return "agentFileUpdated(session: \(sessionId.prefix(8)), task: \(taskToolId.prefix(12)), tools: \(tools.count))"
         }
     }
 }

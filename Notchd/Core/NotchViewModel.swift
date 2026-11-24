@@ -12,7 +12,6 @@ import SwiftUI
 enum NotchStatus: Equatable {
     case closed
     case opened
-    case popping
 }
 
 enum NotchOpenReason {
@@ -55,12 +54,10 @@ class NotchViewModel: ObservableObject {
     // MARK: - Geometry
 
     let geometry: NotchGeometry
-    let spacing: CGFloat = 12
     let hasPhysicalNotch: Bool
 
     var deviceNotchRect: CGRect { geometry.deviceNotchRect }
     var screenRect: CGRect { geometry.screenRect }
-    var windowHeight: CGFloat { geometry.windowHeight }
 
     /// Dynamic opened size based on content type
     var openedSize: CGSize {
@@ -88,12 +85,6 @@ class NotchViewModel: ObservableObject {
                 height: 320
             )
         }
-    }
-
-    // MARK: - Animation
-
-    var animation: Animation {
-        .easeOut(duration: 0.25)
     }
 
     // MARK: - Private
@@ -172,7 +163,7 @@ class NotchViewModel: ObservableObject {
         hoverTimer = nil
 
         // Start hover timer to auto-expand after 1 second
-        if isHovering && (status == .closed || status == .popping) {
+        if isHovering && status == .closed {
             let workItem = DispatchWorkItem { [weak self] in
                 guard let self = self, self.isHovering else { return }
                 self.notchOpen(reason: .hover)
@@ -197,7 +188,7 @@ class NotchViewModel: ObservableObject {
                     notchClose()
                 }
             }
-        case .closed, .popping:
+        case .closed:
             if geometry.isPointInNotch(location) {
                 notchOpen(reason: .click)
             }
@@ -264,16 +255,6 @@ class NotchViewModel: ObservableObject {
         }
         status = .closed
         contentType = .instances
-    }
-
-    func notchPop() {
-        guard status == .closed else { return }
-        status = .popping
-    }
-
-    func notchUnpop() {
-        guard status == .popping else { return }
-        status = .closed
     }
 
     func toggleMenu() {
