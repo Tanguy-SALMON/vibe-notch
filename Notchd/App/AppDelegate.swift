@@ -28,11 +28,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        migrateLegacyDefaults()
+        // Single-instance check first: a duplicate launch must quit before touching defaults or analytics.
         if !ensureSingleInstance() {
             NSApplication.shared.terminate(nil)
             return
         }
+        migrateLegacyDefaults()
 
         Mixpanel.initialize(token: "49814c1436104ed108f3fc4735228496")
 
@@ -110,20 +111,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return newId
     }
 
+    /// Scans the Claude projects directory off the main thread (it can hold many sessions), then registers the
+    /// Claude Code version with analytics back on the main thread.
     private func fetchAndRegisterClaudeVersion() {
         let claudeProjectsDir = ClaudePaths.projectsDir
+        Task.detached(priority: .utility) {
+            guard let version = Self.latestClaudeVersion(in: claudeProjectsDir) else { return }
+            await MainActor.run {
+                Mixpanel.mainInstance().registerSuperProperties(["claude_code_version": version])
+                Mixpanel.mainInstance().people.set(properties: ["claude_code_version": version])
+            }
+        }
+    }
 
-        guard let projectDirs = try? FileManager.default.contentsOfDirectory(
+    nonisolated private static func latestClaudeVersion(in claudeProjectsDir: URL) -> String? {
+        let fm = FileManager.default
+        guard let projectDirs = try? fm.contentsOfDirectory(
             at: claudeProjectsDir,
             includingPropertiesForKeys: [.contentModificationDateKey],
             options: .skipsHiddenFiles
-        ) else { return }
+        ) else { return nil }
 
         var latestFile: URL?
         var latestDate: Date?
 
         for projectDir in projectDirs {
-            guard let files = try? FileManager.default.contentsOfDirectory(
+            guard let files = try? fm.contentsOfDirectory(
                 at: projectDir,
                 includingPropertiesForKeys: [.contentModificationDateKey],
                 options: .skipsHiddenFiles
@@ -139,21 +152,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         guard let jsonlFile = latestFile,
-              let handle = FileHandle(forReadingAtPath: jsonlFile.path) else { return }
+              let handle = FileHandle(forReadingAtPath: jsonlFile.path) else { return nil }
         defer { try? handle.close() }
 
         let data = handle.readData(ofLength: 8192)
-        guard let content = String(data: data, encoding: .utf8) else { return }
+        // The 8 KB read can cut a multi-byte character; decode lossily so the complete lines still parse.
+        let content = String(decoding: data, as: UTF8.self)
 
         for line in content.components(separatedBy: .newlines) where !line.isEmpty {
             guard let lineData = line.data(using: .utf8),
                   let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
                   let version = json["version"] as? String else { continue }
-
-            Mixpanel.mainInstance().registerSuperProperties(["claude_code_version": version])
-            Mixpanel.mainInstance().people.set(properties: ["claude_code_version": version])
-            return
+            return version
         }
+        return nil
     }
 
     private func ensureSingleInstance() -> Bool {
