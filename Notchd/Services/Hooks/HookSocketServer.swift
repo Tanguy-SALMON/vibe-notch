@@ -200,16 +200,21 @@ class HookSocketServer {
 
     /// Stop the socket server
     func stop() {
-        acceptSource?.cancel()
-        acceptSource = nil
-        unlink(Self.socketPath)
+        // acceptSource/serverSocket are owned by `queue`; mutate them there
+        // to avoid racing with startServer/acceptConnection.
+        queue.sync {
+            acceptSource?.cancel()
+            acceptSource = nil
+            unlink(Self.socketPath)
 
-        permissionsLock.lock()
-        for (_, pending) in pendingPermissions {
-            close(pending.clientSocket)
+            permissionsLock.lock()
+            let pending = pendingPermissions
+            pendingPermissions.removeAll()
+            permissionsLock.unlock()
+            for (_, p) in pending {
+                close(p.clientSocket)
+            }
         }
-        pendingPermissions.removeAll()
-        permissionsLock.unlock()
     }
 
     /// Respond to a pending permission request by toolUseId
@@ -272,12 +277,14 @@ class HookSocketServer {
     private func cleanupPendingPermissions(sessionId: String) {
         permissionsLock.lock()
         let matching = pendingPermissions.filter { $0.value.sessionId == sessionId }
-        for (toolUseId, pending) in matching {
-            logger.debug("Cleaning up stale permission for \(sessionId.prefix(8), privacy: .public) tool:\(toolUseId.prefix(12), privacy: .public)")
-            close(pending.clientSocket)
+        for toolUseId in matching.keys {
             pendingPermissions.removeValue(forKey: toolUseId)
         }
         permissionsLock.unlock()
+        for (toolUseId, pending) in matching {
+            logger.debug("Cleaning up stale permission for \(sessionId.prefix(8), privacy: .public) tool:\(toolUseId.prefix(12), privacy: .public)")
+            close(pending.clientSocket)
+        }
     }
 
     // MARK: - Tool Use ID Cache
@@ -358,41 +365,55 @@ class HookSocketServer {
     // MARK: - Private
 
     private func acceptConnection() {
-        let clientSocket = accept(serverSocket, nil, nil)
-        guard clientSocket >= 0 else { return }
+        // Drain every queued connection: the read source may coalesce
+        // several pending connects into a single event.
+        while serverSocket >= 0 {
+            let clientSocket = accept(serverSocket, nil, nil)
+            guard clientSocket >= 0 else { return }
 
-        var nosigpipe: Int32 = 1
-        setsockopt(clientSocket, SOL_SOCKET, SO_NOSIGPIPE, &nosigpipe, socklen_t(MemoryLayout<Int32>.size))
+            var nosigpipe: Int32 = 1
+            setsockopt(clientSocket, SOL_SOCKET, SO_NOSIGPIPE, &nosigpipe, socklen_t(MemoryLayout<Int32>.size))
 
-        handleClient(clientSocket)
+            handleClient(clientSocket)
+        }
     }
+
+    /// Reusable read buffer (only touched on `queue`)
+    private var readBuffer = [UInt8](repeating: 0, count: 65536)
 
     private func handleClient(_ clientSocket: Int32) {
         let flags = fcntl(clientSocket, F_GETFL)
         _ = fcntl(clientSocket, F_SETFL, flags | O_NONBLOCK)
 
         var allData = Data()
-        var buffer = [UInt8](repeating: 0, count: 131072)
         var pollFd = pollfd(fd: clientSocket, events: Int16(POLLIN), revents: 0)
 
-        let startTime = Date()
-        while Date().timeIntervalSince(startTime) < 0.5 {
+        // Read until EOF (the hook half-closes after sending), or until the
+        // data pauses after something was received (older hooks that don't
+        // half-close), bounded by an overall deadline.
+        let deadline = DispatchTime.now().uptimeNanoseconds + 500_000_000
+        while DispatchTime.now().uptimeNanoseconds < deadline {
+            pollFd.revents = 0
             let pollResult = poll(&pollFd, 1, 50)
 
-            if pollResult > 0 && (pollFd.revents & Int16(POLLIN)) != 0 {
-                let bytesRead = read(clientSocket, &buffer, buffer.count)
+            if pollResult > 0 && (pollFd.revents & Int16(POLLIN | POLLHUP)) != 0 {
+                let bytesRead = readBuffer.withUnsafeMutableBytes { buf in
+                    read(clientSocket, buf.baseAddress, buf.count)
+                }
 
                 if bytesRead > 0 {
-                    allData.append(contentsOf: buffer[0..<bytesRead])
+                    allData.append(contentsOf: readBuffer[0..<bytesRead])
                 } else if bytesRead == 0 {
                     break
-                } else if errno != EAGAIN && errno != EWOULDBLOCK {
+                } else if errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR {
                     break
                 }
             } else if pollResult == 0 {
                 if !allData.isEmpty {
                     break
                 }
+            } else if pollResult < 0 && errno == EINTR {
+                continue
             } else {
                 break
             }
@@ -467,8 +488,13 @@ class HookSocketServer {
                 receivedAt: Date()
             )
             permissionsLock.lock()
-            pendingPermissions[toolUseId] = pending
+            let replaced = pendingPermissions.updateValue(pending, forKey: toolUseId)
             permissionsLock.unlock()
+            // A duplicate request for the same tool supersedes the old one;
+            // close the stale socket instead of leaking it.
+            if let replaced, replaced.clientSocket != clientSocket {
+                close(replaced.clientSocket)
+            }
 
             eventHandler?(updatedEvent)
             return
@@ -497,20 +523,37 @@ class HookSocketServer {
         let age = Date().timeIntervalSince(pending.receivedAt)
         logger.info("Sending response: \(decision, privacy: .public) for \(pending.sessionId.prefix(8), privacy: .public) tool:\(toolUseId.prefix(12), privacy: .public) (age: \(String(format: "%.1f", age), privacy: .public)s)")
 
-        data.withUnsafeBytes { bytes in
-            guard let baseAddress = bytes.baseAddress else {
-                logger.error("Failed to get data buffer address")
-                return
-            }
-            let result = write(pending.clientSocket, baseAddress, data.count)
-            if result < 0 {
-                logger.error("Write failed with errno: \(errno)")
-            } else {
-                logger.debug("Write succeeded: \(result) bytes")
-            }
-        }
-
+        _ = writeAll(pending.clientSocket, data)
         close(pending.clientSocket)
+    }
+
+    /// Write the whole buffer to a non-blocking socket, waiting (briefly) for
+    /// writability on EAGAIN and retrying on EINTR / short writes.
+    private func writeAll(_ fd: Int32, _ data: Data) -> Bool {
+        let ok: Bool = data.withUnsafeBytes { bytes in
+            guard let base = bytes.baseAddress else { return data.isEmpty }
+            var offset = 0
+            while offset < data.count {
+                let n = write(fd, base + offset, data.count - offset)
+                if n > 0 {
+                    offset += n
+                } else if n < 0 && errno == EINTR {
+                    continue
+                } else if n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    var pfd = pollfd(fd: fd, events: Int16(POLLOUT), revents: 0)
+                    if poll(&pfd, 1, 1000) <= 0 { return false }
+                } else {
+                    return false
+                }
+            }
+            return true
+        }
+        if ok {
+            logger.debug("Write succeeded: \(data.count) bytes")
+        } else {
+            logger.error("Write failed with errno: \(errno)")
+        }
+        return ok
     }
 
     private func sendPermissionResponseBySession(sessionId: String, decision: String, reason: String?) {
@@ -539,20 +582,7 @@ class HookSocketServer {
         let age = Date().timeIntervalSince(pending.receivedAt)
         logger.info("Sending response: \(decision, privacy: .public) for \(sessionId.prefix(8), privacy: .public) tool:\(pending.toolUseId.prefix(12), privacy: .public) (age: \(String(format: "%.1f", age), privacy: .public)s)")
 
-        var writeSuccess = false
-        data.withUnsafeBytes { bytes in
-            guard let baseAddress = bytes.baseAddress else {
-                logger.error("Failed to get data buffer address")
-                return
-            }
-            let result = write(pending.clientSocket, baseAddress, data.count)
-            if result < 0 {
-                logger.error("Write failed with errno: \(errno)")
-            } else {
-                logger.debug("Write succeeded: \(result) bytes")
-                writeSuccess = true
-            }
-        }
+        let writeSuccess = writeAll(pending.clientSocket, data)
 
         close(pending.clientSocket)
 

@@ -6,19 +6,42 @@ Notchd Hook
 """
 import json
 import os
-import socket
 import sys
 
 SOCKET_PATH = "/tmp/notchd.sock"
 TIMEOUT_SECONDS = 300  # 5 minutes for permission decisions
+IO_TIMEOUT_SECONDS = 1  # connect/send; never stall Claude Code when the app is busy or gone
 
 
-def get_tty():
-    """Get the TTY of the Claude process (parent)"""
-    import subprocess
+def get_tty(session_id):
+    """Get the TTY of the Claude process (parent).
 
-    # Get parent PID (Claude process)
+    Spawning `ps` costs far more than the rest of this hook, and the TTY of
+    a Claude process never changes, so the result is cached per (session, pid).
+    """
     ppid = os.getppid()
+    cache_path = None
+    tmpdir = os.environ.get("TMPDIR") or "/tmp"
+    if session_id and "/" not in session_id:
+        cache_path = os.path.join(tmpdir, "notchd-tty-%s-%d" % (session_id, ppid))
+        try:
+            with open(cache_path) as f:
+                return f.read() or None
+        except OSError:
+            pass
+
+    tty = _lookup_tty(ppid)
+    if cache_path:
+        try:
+            with open(cache_path, "w") as f:
+                f.write(tty or "")
+        except OSError:
+            pass
+    return tty
+
+
+def _lookup_tty(ppid):
+    import subprocess
 
     # Try to get TTY from ps command for the parent process
     try:
@@ -51,31 +74,51 @@ def get_tty():
 
 def send_event(state):
     """Send event to app, return response if any"""
+    import socket
+
+    sock = None
     try:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.settimeout(TIMEOUT_SECONDS)
+        sock.settimeout(IO_TIMEOUT_SECONDS)
         sock.connect(SOCKET_PATH)
         sock.sendall(json.dumps(state).encode())
+        # Half-close so the app sees EOF immediately instead of waiting for
+        # a read pause; the read side stays open for the permission reply.
+        sock.shutdown(socket.SHUT_WR)
 
-        # For permission requests, wait for response
+        # For permission requests, wait for response (until the app closes)
         if state.get("status") == "waiting_for_approval":
-            response = sock.recv(4096)
-            sock.close()
+            sock.settimeout(TIMEOUT_SECONDS)
+            chunks = []
+            while True:
+                chunk = sock.recv(4096)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+            response = b"".join(chunks)
             if response:
                 return json.loads(response.decode())
-        else:
-            sock.close()
 
         return None
-    except (socket.error, OSError, json.JSONDecodeError):
+    except (OSError, ValueError):
         return None
+    finally:
+        if sock is not None:
+            try:
+                sock.close()
+            except OSError:
+                pass
 
 
 def main():
     try:
         data = json.load(sys.stdin)
-    except json.JSONDecodeError:
+    except ValueError:
         sys.exit(1)
+
+    # App not running: nothing to notify, skip all work (incl. spawning ps).
+    if not os.path.exists(SOCKET_PATH):
+        sys.exit(0)
 
     session_id = data.get("session_id", "unknown")
     event = data.get("hook_event_name", "")
@@ -84,7 +127,7 @@ def main():
 
     # Get process info
     claude_pid = os.getppid()
-    tty = get_tty()
+    tty = get_tty(session_id)
 
     # Build state object
     state = {
@@ -213,6 +256,13 @@ def main():
 
     elif event == "SessionEnd":
         state["status"] = "ended"
+        try:
+            if "/" in session_id:
+                raise OSError
+            os.unlink(os.path.join(os.environ.get("TMPDIR") or "/tmp",
+                                   "notchd-tty-%s-%d" % (session_id, claude_pid)))
+        except (OSError, TypeError):
+            pass
 
     elif event == "PreCompact":
         # Context is being compacted (manual or auto)
